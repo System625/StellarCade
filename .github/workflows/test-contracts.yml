@@ -33,6 +33,7 @@ jobs:
           cd ../random-generator && cargo build --target wasm32-unknown-unknown --release
           cd ../coin-flip && cargo build --target wasm32-unknown-unknown --release
           cd ../pattern-puzzle && cargo build --target wasm32-unknown-unknown --release
+          cd ../emergency-pause && cargo build --target wasm32-unknown-unknown --release
 
       - name: Run Tests
         run: |
@@ -41,3 +42,4 @@ jobs:
           cd ../random-generator && cargo test
           cd ../coin-flip && cargo test
           cd ../pattern-puzzle && cargo test
+          cd ../emergency-pause && cargo test

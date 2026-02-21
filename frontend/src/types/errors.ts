@@ -1,49 +1,171 @@
 /**
- * Typed domain errors for the Soroban Contract Client.
+ * Stellarcade domain error catalog.
  *
- * All errors thrown by `SorobanContractClient` are instances of
- * `SorobanClientError`, carrying a `code` that consumers can switch on and a
- * `retryable` flag indicating whether the operation can be safely retried.
+ * Two complementary error systems co-exist in this file:
+ *
+ * 1. `AppError` / `ErrorDomain` / `ErrorSeverity` — generic structured error
+ *    catalog used by global state, error mapping, and telemetry pipelines.
+ *
+ * 2. `SorobanErrorCode` / `SorobanClientError` — typed errors thrown by
+ *    `SorobanContractClient`.  All public client methods return
+ *    `ContractResult<T>`, which wraps these errors in a discriminated union so
+ *    callers never need a try/catch.
  */
+
+// ---------------------------------------------------------------------------
+// Part 1 — Generic AppError catalog (global state / error-mapping service)
+// ---------------------------------------------------------------------------
+
+export const ErrorDomain = {
+  RPC:      'rpc',
+  API:      'api',
+  WALLET:   'wallet',
+  CONTRACT: 'contract',
+  UNKNOWN:  'unknown',
+} as const;
+
+export type ErrorDomain = (typeof ErrorDomain)[keyof typeof ErrorDomain];
+
+export const ErrorSeverity = {
+  /** Transient failure — caller may retry after a delay. */
+  RETRYABLE: 'retryable',
+  /** User must take an explicit action (connect wallet, switch network, etc.). */
+  USER_ACTIONABLE: 'user_actionable',
+  /** Non-recoverable — no retry or user action will resolve it. */
+  FATAL: 'fatal',
+} as const;
+
+export type ErrorSeverity = (typeof ErrorSeverity)[keyof typeof ErrorSeverity];
+
+export type RpcErrorCode =
+  | 'RPC_NODE_UNAVAILABLE'
+  | 'RPC_CONNECTION_TIMEOUT'
+  | 'RPC_SIMULATION_FAILED'
+  | 'RPC_TX_REJECTED'
+  | 'RPC_TX_EXPIRED'
+  | 'RPC_RESOURCE_LIMIT_EXCEEDED'
+  | 'RPC_INVALID_RESPONSE'
+  | 'RPC_UNKNOWN';
+
+export type ApiErrorCode =
+  | 'API_NETWORK_ERROR'
+  | 'API_UNAUTHORIZED'
+  | 'API_FORBIDDEN'
+  | 'API_NOT_FOUND'
+  | 'API_VALIDATION_ERROR'
+  | 'API_RATE_LIMITED'
+  | 'API_SERVER_ERROR'
+  | 'API_UNKNOWN';
+
+export type WalletErrorCode =
+  | 'WALLET_NOT_INSTALLED'
+  | 'WALLET_NOT_CONNECTED'
+  | 'WALLET_USER_REJECTED'
+  | 'WALLET_NETWORK_MISMATCH'
+  | 'WALLET_INSUFFICIENT_BALANCE'
+  | 'WALLET_SIGN_FAILED'
+  | 'WALLET_UNKNOWN';
+
+/**
+ * Contract error codes cover all numeric variants across deployed Stellarcade
+ * contracts. Codes are disambiguated by ContractName before mapping.
+ */
+export type ContractErrorCode =
+  | 'CONTRACT_ALREADY_INITIALIZED'
+  | 'CONTRACT_NOT_INITIALIZED'
+  | 'CONTRACT_NOT_AUTHORIZED'
+  | 'CONTRACT_INVALID_AMOUNT'
+  | 'CONTRACT_INSUFFICIENT_FUNDS'
+  | 'CONTRACT_GAME_ALREADY_RESERVED'
+  | 'CONTRACT_RESERVATION_NOT_FOUND'
+  | 'CONTRACT_PAYOUT_EXCEEDS_RESERVATION'
+  | 'CONTRACT_OVERFLOW'
+  | 'CONTRACT_INVALID_BOUND'
+  | 'CONTRACT_DUPLICATE_REQUEST_ID'
+  | 'CONTRACT_REQUEST_NOT_FOUND'
+  | 'CONTRACT_ALREADY_FULFILLED'
+  | 'CONTRACT_UNAUTHORIZED_CALLER'
+  | 'CONTRACT_UNKNOWN';
+
+export type AppErrorCode =
+  | RpcErrorCode
+  | ApiErrorCode
+  | WalletErrorCode
+  | ContractErrorCode
+  | 'UNKNOWN';
+
+export interface AppError {
+  /** Structured code for programmatic branching — never parse `message` for logic. */
+  code: AppErrorCode;
+  domain: ErrorDomain;
+  severity: ErrorSeverity;
+  /**
+   * Human-readable description intended for developer tooling and logs.
+   * Do NOT render this string directly in user-facing UI without sanitisation.
+   */
+  message: string;
+  /** The raw error that was mapped, preserved for debugging and logging. */
+  originalError?: unknown;
+  /** Caller-provided enrichment (e.g. gameId, requestId, walletAddress). */
+  context?: Record<string, unknown>;
+  /** For RETRYABLE errors: suggested minimum wait before retrying (ms). */
+  retryAfterMs?: number;
+}
+
+export type ErrorMappingHint = ErrorDomain;
+
+/**
+ * Named identifiers for each deployed Stellarcade Soroban contract.
+ * Required by mapContractError() to disambiguate shared numeric error slots.
+ */
+export const ContractName = {
+  PRIZE_POOL:        'prize_pool',
+  RANDOM_GENERATOR:  'random_generator',
+  ACCESS_CONTROL:    'access_control',
+  PATTERN_PUZZLE:    'pattern_puzzle',
+  COIN_FLIP:         'coin_flip',
+} as const;
+
+export type ContractName = (typeof ContractName)[keyof typeof ContractName];
+
+export interface TelemetryEvent {
+  errorCode: AppErrorCode;
+  domain: ErrorDomain;
+  severity: ErrorSeverity;
+  message: string;
+  timestamp: number;
+  correlationId?: string;
+  userId?: string;
+  context?: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Part 2 — SorobanClientError (used by SorobanContractClient)
+// ---------------------------------------------------------------------------
 
 export enum SorobanErrorCode {
   // ── Network / RPC ──────────────────────────────────────────────────────
-  /** Generic network connectivity failure (timeout, DNS, etc.). */
   NetworkError = "NETWORK_ERROR",
-  /** The Soroban RPC server returned an unexpected error response. */
   RpcError = "RPC_ERROR",
-  /** Transaction simulation indicated it would fail on-chain. */
   SimulationFailed = "SIMULATION_FAILED",
-  /** Transaction was submitted but was not included or failed on-chain. */
   TransactionFailed = "TX_FAILED",
 
   // ── Wallet ─────────────────────────────────────────────────────────────
-  /** No wallet is connected; user must connect before calling write methods. */
   WalletNotConnected = "WALLET_NOT_CONNECTED",
-  /** The wallet is connected to a different Stellar network. */
   NetworkMismatch = "NETWORK_MISMATCH",
-  /** The user declined to sign the transaction in their wallet. */
   UserRejected = "USER_REJECTED",
 
   // ── Contract ───────────────────────────────────────────────────────────
-  /**
-   * The contract returned an error code (e.g., NotAuthorized, BadgeNotFound).
-   * The `contractErrorCode` field carries the raw u32 value from Soroban.
-   */
   ContractError = "CONTRACT_ERROR",
 
   // ── Validation ─────────────────────────────────────────────────────────
-  /** A caller-supplied parameter failed pre-call validation. */
   InvalidParameter = "INVALID_PARAMETER",
-  /** A required contract address is missing from the registry. */
   ContractAddressNotFound = "CONTRACT_ADDRESS_NOT_FOUND",
 
   // ── Retry ──────────────────────────────────────────────────────────────
-  /** All retry attempts have been exhausted without a successful result. */
   RetryExhausted = "RETRY_EXHAUSTED",
 }
 
-/** Named Soroban contract error codes mapped to human-readable names. */
 export const AchievementBadgeErrors: Record<number, string> = {
   1: "AlreadyInitialized",
   2: "NotInitialized",
@@ -66,36 +188,10 @@ export const PrizePoolErrors: Record<number, string> = {
   9: "Overflow",
 };
 
-/**
- * Domain error thrown by `SorobanContractClient` for every failure path.
- *
- * @example
- * ```ts
- * const result = await client.badge_award(admin, user, 1n);
- * if (!result.success) {
- *   if (result.error.code === SorobanErrorCode.ContractError) {
- *     console.error("Contract error code:", result.error.contractErrorCode);
- *   }
- * }
- * ```
- */
 export class SorobanClientError extends Error {
-  /** Machine-readable error category. */
   readonly code: SorobanErrorCode;
-
-  /**
-   * Whether this error class is safe to retry automatically.
-   * Terminal errors (contract logic failures, invalid params) are `false`.
-   */
   readonly retryable: boolean;
-
-  /**
-   * Raw u32 error code returned by the contract when `code` is
-   * `SorobanErrorCode.ContractError`.  `undefined` for all other codes.
-   */
   readonly contractErrorCode?: number;
-
-  /** The original SDK or network exception that caused this error. */
   readonly originalError?: unknown;
 
   constructor(opts: {
@@ -111,12 +207,9 @@ export class SorobanClientError extends Error {
     this.retryable = opts.retryable ?? false;
     this.contractErrorCode = opts.contractErrorCode;
     this.originalError = opts.originalError;
-
-    // Restore prototype chain for `instanceof` checks in transpiled code.
     Object.setPrototypeOf(this, new.target.prototype);
   }
 
-  /** Convenience factory: wallet not connected. */
   static walletNotConnected(): SorobanClientError {
     return new SorobanClientError({
       code: SorobanErrorCode.WalletNotConnected,
@@ -125,7 +218,6 @@ export class SorobanClientError extends Error {
     });
   }
 
-  /** Convenience factory: network mismatch. */
   static networkMismatch(expected: string, actual: string): SorobanClientError {
     return new SorobanClientError({
       code: SorobanErrorCode.NetworkMismatch,
@@ -134,7 +226,6 @@ export class SorobanClientError extends Error {
     });
   }
 
-  /** Convenience factory: invalid parameter. */
   static invalidParam(paramName: string, reason: string): SorobanClientError {
     return new SorobanClientError({
       code: SorobanErrorCode.InvalidParameter,
@@ -143,7 +234,6 @@ export class SorobanClientError extends Error {
     });
   }
 
-  /** Convenience factory: contract address not found in registry. */
   static addressNotFound(contractName: string): SorobanClientError {
     return new SorobanClientError({
       code: SorobanErrorCode.ContractAddressNotFound,

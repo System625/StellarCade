@@ -1,17 +1,17 @@
 [package]
-name = "stellarcade-random-generator"
+name = "stellarcade-tournament-system"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [dependencies]
-soroban-sdk = "25.0.2"
+soroban-sdk = "25.1.1"
 
 [dev-dependencies]
-soroban-sdk = { version = "25.0.2", features = ["testutils"] }
+soroban-sdk = { version = "25.1.1", features = ["testutils"] }
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [profile.release]
 opt-level = "z"

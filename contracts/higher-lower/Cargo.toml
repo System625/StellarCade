@@ -1,5 +1,5 @@
 [package]
-name = "stellarcade-random-generator"
+name = "stellarcade-higher-lower"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -9,9 +9,10 @@ soroban-sdk = "25.0.2"
 
 [dev-dependencies]
 soroban-sdk = { version = "25.0.2", features = ["testutils"] }
+stellarcade-user-balance = { path = "../user-balance" }
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [profile.release]
 opt-level = "z"

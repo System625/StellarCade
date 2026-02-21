@@ -1,5 +1,5 @@
 [package]
-name = "stellarcade-random-generator"
+name = "stellarcade-daily-trivia"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -11,7 +11,7 @@ soroban-sdk = "25.0.2"
 soroban-sdk = { version = "25.0.2", features = ["testutils"] }
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [profile.release]
 opt-level = "z"
