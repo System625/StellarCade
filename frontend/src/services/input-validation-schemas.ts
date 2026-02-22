@@ -151,17 +151,17 @@ export function validateRoundId(
   const result = validateGameId(value);
 
   if (!result.success) {
-    const MESSAGE_MAP: Partial<Record<string, string>> = {
-      'Game ID is required': 'Round ID is required',
-      'Game ID must be a valid integer': 'Round ID must be a valid integer',
-      'Game ID must be non-negative': 'Round ID must be non-negative',
+    const MESSAGE_BY_CODE: Partial<Record<ValidationErrorCode, string>> = {
+      [ValidationErrorCode.Required]:    'Round ID is required',
+      [ValidationErrorCode.InvalidType]: 'Round ID must be a valid integer',
+      [ValidationErrorCode.OutOfRange]:  'Round ID must be non-negative',
     };
     return {
       success: false,
       error: {
         ...result.error,
         field: 'roundId',
-        message: MESSAGE_MAP[result.error.message] ?? result.error.message,
+        message: MESSAGE_BY_CODE[result.error.code] ?? result.error.message,
       },
     };
   }
@@ -379,7 +379,9 @@ export function parseCoinFlipBet(input: CoinFlipBetInput): ValidationResult<Pars
   if (!sideResult.success) return sideResult;
 
   const addressResult = validateStellarAddress(input.walletAddress);
-  if (!addressResult.success) return addressResult;
+  if (!addressResult.success) {
+    return { success: false, error: { ...addressResult.error, field: 'walletAddress' } };
+  }
 
   return {
     success: true,
@@ -439,7 +441,9 @@ export function parsePatternSubmission(
   if (!feeResult.success) return feeResult;
 
   const addressResult = validateStellarAddress(input.walletAddress);
-  if (!addressResult.success) return addressResult;
+  if (!addressResult.success) {
+    return { success: false, error: { ...addressResult.error, field: 'walletAddress' } };
+  }
 
   return {
     success: true,
@@ -570,7 +574,9 @@ export function parsePrizePoolPayout(
   }
 
   const recipientResult = validateStellarAddress(input.recipient);
-  if (!recipientResult.success) return recipientResult;
+  if (!recipientResult.success) {
+    return { success: false, error: { ...recipientResult.error, field: 'recipient' } };
+  }
 
   return {
     success: true,

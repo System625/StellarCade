@@ -365,7 +365,7 @@ describe('parseCoinFlipBet', () => {
   it('fails when walletAddress is null', () => {
     const result = parseCoinFlipBet({ ...validInput, walletAddress: null });
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.field).toBe('address');
+    if (!result.success) expect(result.error.field).toBe('walletAddress');
   });
 
   it('respects custom wager bounds', () => {
