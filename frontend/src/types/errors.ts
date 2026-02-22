@@ -1,13 +1,19 @@
 /**
  * Stellarcade domain error catalog.
  *
- * All external failure surfaces (Soroban RPC, backend API, wallet provider,
- * smart contract logic) are mapped to typed AppError values so consuming
- * modules never inspect raw provider errors directly.
+ * Two complementary error systems co-exist in this file:
+ *
+ * 1. `AppError` / `ErrorDomain` / `ErrorSeverity` — generic structured error
+ *    catalog used by global state, error mapping, and telemetry pipelines.
+ *
+ * 2. `SorobanErrorCode` / `SorobanClientError` — typed errors thrown by
+ *    `SorobanContractClient`.  All public client methods return
+ *    `ContractResult<T>`, which wraps these errors in a discriminated union so
+ *    callers never need a try/catch.
  */
 
 // ---------------------------------------------------------------------------
-// Domains
+// Part 1 — Generic AppError catalog (global state / error-mapping service)
 // ---------------------------------------------------------------------------
 
 export const ErrorDomain = {
@@ -20,10 +26,6 @@ export const ErrorDomain = {
 
 export type ErrorDomain = (typeof ErrorDomain)[keyof typeof ErrorDomain];
 
-// ---------------------------------------------------------------------------
-// Severity
-// ---------------------------------------------------------------------------
-
 export const ErrorSeverity = {
   /** Transient failure — caller may retry after a delay. */
   RETRYABLE: 'retryable',
@@ -34,10 +36,6 @@ export const ErrorSeverity = {
 } as const;
 
 export type ErrorSeverity = (typeof ErrorSeverity)[keyof typeof ErrorSeverity];
-
-// ---------------------------------------------------------------------------
-// Error codes — one union per domain
-// ---------------------------------------------------------------------------
 
 export type RpcErrorCode =
   | 'RPC_NODE_UNAVAILABLE'
@@ -70,8 +68,7 @@ export type WalletErrorCode =
 
 /**
  * Contract error codes cover all numeric variants across deployed Stellarcade
- * contracts. Codes are disambiguated by ContractName before mapping — numeric
- * slot 4 means InvalidAmount in PrizePool but InvalidBound in RandomGenerator.
+ * contracts. Codes are disambiguated by ContractName before mapping.
  */
 export type ContractErrorCode =
   | 'CONTRACT_ALREADY_INITIALIZED'
@@ -97,10 +94,6 @@ export type AppErrorCode =
   | ContractErrorCode
   | 'UNKNOWN';
 
-// ---------------------------------------------------------------------------
-// Core AppError
-// ---------------------------------------------------------------------------
-
 export interface AppError {
   /** Structured code for programmatic branching — never parse `message` for logic. */
   code: AppErrorCode;
@@ -119,11 +112,6 @@ export interface AppError {
   retryAfterMs?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Supporting types
-// ---------------------------------------------------------------------------
-
-/** Hint passed to toAppError() when the domain cannot be auto-detected. */
 export type ErrorMappingHint = ErrorDomain;
 
 /**
@@ -140,7 +128,6 @@ export const ContractName = {
 
 export type ContractName = (typeof ContractName)[keyof typeof ContractName];
 
-/** Structured payload for telemetry/logging pipelines. */
 export interface TelemetryEvent {
   errorCode: AppErrorCode;
   domain: ErrorDomain;
@@ -150,4 +137,108 @@ export interface TelemetryEvent {
   correlationId?: string;
   userId?: string;
   context?: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Part 2 — SorobanClientError (used by SorobanContractClient)
+// ---------------------------------------------------------------------------
+
+export enum SorobanErrorCode {
+  // ── Network / RPC ──────────────────────────────────────────────────────
+  NetworkError = "NETWORK_ERROR",
+  RpcError = "RPC_ERROR",
+  SimulationFailed = "SIMULATION_FAILED",
+  TransactionFailed = "TX_FAILED",
+
+  // ── Wallet ─────────────────────────────────────────────────────────────
+  WalletNotConnected = "WALLET_NOT_CONNECTED",
+  NetworkMismatch = "NETWORK_MISMATCH",
+  UserRejected = "USER_REJECTED",
+
+  // ── Contract ───────────────────────────────────────────────────────────
+  ContractError = "CONTRACT_ERROR",
+
+  // ── Validation ─────────────────────────────────────────────────────────
+  InvalidParameter = "INVALID_PARAMETER",
+  ContractAddressNotFound = "CONTRACT_ADDRESS_NOT_FOUND",
+
+  // ── Retry ──────────────────────────────────────────────────────────────
+  RetryExhausted = "RETRY_EXHAUSTED",
+}
+
+export const AchievementBadgeErrors: Record<number, string> = {
+  1: "AlreadyInitialized",
+  2: "NotInitialized",
+  3: "NotAuthorized",
+  4: "BadgeNotFound",
+  5: "BadgeAlreadyExists",
+  6: "BadgeAlreadyAwarded",
+  7: "InvalidInput",
+};
+
+export const PrizePoolErrors: Record<number, string> = {
+  1: "AlreadyInitialized",
+  2: "NotInitialized",
+  3: "NotAuthorized",
+  4: "InvalidAmount",
+  5: "InsufficientFunds",
+  6: "GameAlreadyReserved",
+  7: "ReservationNotFound",
+  8: "PayoutExceedsReservation",
+  9: "Overflow",
+};
+
+export class SorobanClientError extends Error {
+  readonly code: SorobanErrorCode;
+  readonly retryable: boolean;
+  readonly contractErrorCode?: number;
+  readonly originalError?: unknown;
+
+  constructor(opts: {
+    code: SorobanErrorCode;
+    message: string;
+    retryable?: boolean;
+    contractErrorCode?: number;
+    originalError?: unknown;
+  }) {
+    super(opts.message);
+    this.name = "SorobanClientError";
+    this.code = opts.code;
+    this.retryable = opts.retryable ?? false;
+    this.contractErrorCode = opts.contractErrorCode;
+    this.originalError = opts.originalError;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+
+  static walletNotConnected(): SorobanClientError {
+    return new SorobanClientError({
+      code: SorobanErrorCode.WalletNotConnected,
+      message: "No wallet is connected. Connect a wallet before signing transactions.",
+      retryable: false,
+    });
+  }
+
+  static networkMismatch(expected: string, actual: string): SorobanClientError {
+    return new SorobanClientError({
+      code: SorobanErrorCode.NetworkMismatch,
+      message: `Wallet is on network "${actual}" but client expects "${expected}".`,
+      retryable: false,
+    });
+  }
+
+  static invalidParam(paramName: string, reason: string): SorobanClientError {
+    return new SorobanClientError({
+      code: SorobanErrorCode.InvalidParameter,
+      message: `Invalid parameter "${paramName}": ${reason}`,
+      retryable: false,
+    });
+  }
+
+  static addressNotFound(contractName: string): SorobanClientError {
+    return new SorobanClientError({
+      code: SorobanErrorCode.ContractAddressNotFound,
+      message: `Contract address for "${contractName}" is not set in the registry.`,
+      retryable: false,
+    });
+  }
 }
