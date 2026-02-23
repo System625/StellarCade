@@ -5,6 +5,7 @@ This folder contains the Soroban smart contracts for the Stellarcade platform.
 ## 📂 Structure
 
 - `prize-pool/`: Manages user deposits, platform fees, and prize distributions.
+- `treasury/`: Platform-core treasury for controlled fund allocation and release.
 - `random-generator/`: A provably fair RNG contract.
 - `coin-flip/`: Logic for the classic head-or-tails game.
 - `daily-trivia/`: One-attempt-per-round trivia game with reward settlement.
