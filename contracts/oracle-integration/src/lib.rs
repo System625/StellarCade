@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype,
-    Address, Bytes, BytesN, Env, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, Address, Bytes, BytesN,
+    Env, Vec,
 };
 
 #[contract]
@@ -102,9 +102,7 @@ fn renew_instance_ttl(env: &Env) -> Result<(), Error> {
         .checked_sub(TTL_RENEW_WINDOW)
         .ok_or(Error::Overflow)?;
 
-    env.storage()
-        .instance()
-        .extend_ttl(threshold, max_ttl);
+    env.storage().instance().extend_ttl(threshold, max_ttl);
 
     Ok(())
 }
@@ -117,7 +115,6 @@ fn renew_instance_ttl(env: &Env) -> Result<(), Error> {
 
 #[contractimpl]
 impl OracleIntegration {
-
     // ───────── INIT ─────────
 
     pub fn init(
@@ -125,7 +122,6 @@ impl OracleIntegration {
         admin: Address,
         oracle_sources_config: Vec<Address>,
     ) -> Result<(), Error> {
-
         admin.require_auth();
 
         if env.storage().instance().has(&DataKey::Admin) {
@@ -137,7 +133,9 @@ impl OracleIntegration {
         }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::OracleSources, &oracle_sources_config);
+        env.storage()
+            .instance()
+            .set(&DataKey::OracleSources, &oracle_sources_config);
 
         renew_instance_ttl(&env)?;
 
@@ -148,23 +146,22 @@ impl OracleIntegration {
 
     // ───────── REQUEST DATA ─────────
 
-pub fn request_data(
-    env: Env,
-    caller: Address,
-    feed_id: BytesN<32>,
-    request_id: BytesN<32>,
-) -> Result<(), Error> {
+    pub fn request_data(
+        env: Env,
+        caller: Address,
+        feed_id: BytesN<32>,
+        request_id: BytesN<32>,
+    ) -> Result<(), Error> {
+        caller.require_auth();
 
-    caller.require_auth();
+        // 🔒 Ensure contract is initialized
+        if !env.storage().instance().has(&DataKey::Admin) {
+            return Err(Error::NotAuthorized);
+        }
 
-    // 🔒 Ensure contract is initialized
-    if !env.storage().instance().has(&DataKey::Admin) {
-        return Err(Error::NotAuthorized);
-    }
+        renew_instance_ttl(&env)?;
 
-    renew_instance_ttl(&env)?;
-
-    let zero = BytesN::from_array(&env, &[0; 32]);
+        let zero = BytesN::from_array(&env, &[0; 32]);
         if feed_id == zero || request_id == zero {
             return Err(Error::InvalidInput);
         }
@@ -202,7 +199,6 @@ pub fn request_data(
         payload: Bytes,
         _proof: Bytes,
     ) -> Result<(), Error> {
-
         caller.require_auth();
 
         renew_instance_ttl(&env)?;
@@ -268,11 +264,7 @@ pub fn request_data(
         result
     }
 
-    pub fn get_request(
-        env: Env,
-        request_id: BytesN<32>,
-    ) -> Option<OracleRequest> {
-
+    pub fn get_request(env: Env, request_id: BytesN<32>) -> Option<OracleRequest> {
         let key = DataKey::Request(request_id);
         let result = env.storage().persistent().get(&key);
 
@@ -283,3 +275,6 @@ pub fn request_data(
         result
     }
 }
+
+#[cfg(test)]
+mod test;

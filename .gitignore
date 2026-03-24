@@ -9,6 +9,7 @@ yarn-error.log*
 
 # Rust
 target/
+# CARGO_TARGET_DIR / CI isolation dirs (e.g. target-ci, target-local, target-ai-verify)
 **/target-*/
 **/*.rs.bk
 Cargo.lock
