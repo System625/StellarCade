@@ -4,16 +4,17 @@
  */
 exports.up = function(knex) {
   return knex.schema.createTable('outbox', function(table) {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.string('transaction_xdr').notNullable();
+    // Use text for UUID in SQLite compatibility
+    table.text('id').primary();
+    table.text('transaction_xdr').notNullable();
     table.text('error_message').nullable();
-    table.string('error_code').nullable();
-    table.jsonb('result_codes').nullable();
+    table.text('error_code').nullable();
+    table.text('result_codes').nullable(); // JSON stored as text in SQLite
     table.integer('attempts').notNullable().defaultTo(0);
-    table.timestamp('next_retry_at').nullable();
-    table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
-    table.string('status').notNullable().defaultTo('pending'); // pending, processing, completed, failed
+    table.datetime('next_retry_at').nullable();
+    table.datetime('created_at').notNullable().defaultTo(knex.fn.now());
+    table.datetime('updated_at').notNullable().defaultTo(knex.fn.now());
+    table.text('status').notNullable().defaultTo('pending'); // pending, processing, completed, failed
     
     // Indexes for efficient querying
     table.index(['status', 'next_retry_at']);
@@ -21,7 +22,7 @@ exports.up = function(knex) {
     table.index(['attempts']);
     
     // Add unique constraint to prevent duplicate processing
-    table.string('processing_lock').nullable().unique();
+    table.text('processing_lock').nullable().unique();
   });
 };
 

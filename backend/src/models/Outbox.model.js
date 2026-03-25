@@ -1,4 +1,5 @@
 const knex = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
 
 const Outbox = {
   /**
@@ -10,6 +11,7 @@ const Outbox = {
   async create(data) {
     const [outbox] = await knex('outbox')
       .insert({
+        id: uuidv4(),
         transaction_xdr: data.transaction_xdr,
         status: 'pending',
         next_retry_at: new Date(), // Retry immediately
