@@ -51,3 +51,6 @@ export type { AsyncStateBoundaryProps } from './AsyncStateBoundary';
 
 export { ContractActionButton } from './ContractActionButton';
 export type { ContractActionButtonProps } from './ContractActionButton';
+
+export { SessionTimeoutModal, default as SessionTimeoutModalDefault } from './SessionTimeoutModal';
+export type { SessionTimeoutModalProps } from './SessionTimeoutModal';

@@ -1,0 +1,128 @@
+/**
+ * SessionTimeoutModal — timer and interaction tests.
+ */
+
+import { SessionTimeoutModal } from '@/components/v1/SessionTimeoutModal';
+import WalletSessionService from '@/services/wallet-session-service';
+import { WalletSessionState } from '@/types/wallet-session';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+
+const meta = {
+  provider: { id: 't', name: 'Test' },
+  address: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+  network: 'TESTNET',
+  connectedAt: Date.now(),
+};
+
+describe('SessionTimeoutModal', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function mockConnectedService(remainingMs: number) {
+    const svc = new WalletSessionService({ sessionExpiryMs: 60_000 });
+    vi.spyOn(svc, 'getState').mockReturnValue(WalletSessionState.CONNECTED);
+    vi.spyOn(svc, 'getMeta').mockReturnValue(meta);
+    vi.spyOn(svc, 'getRemainingPersistenceMs').mockReturnValue(remainingMs);
+    vi.spyOn(svc, 'subscribe').mockImplementation((fn) => {
+      fn(WalletSessionState.CONNECTED, meta, null);
+      return () => {};
+    });
+    vi.spyOn(svc, 'extendPersistedSession').mockImplementation(() => {});
+    vi.spyOn(svc, 'disconnect').mockResolvedValue(undefined);
+    return svc;
+  }
+
+  it('shows warning when remaining within threshold', async () => {
+    const svc = mockConnectedService(60_000); // below default 5min warn? 60s is below 300s
+    render(
+      <SessionTimeoutModal
+        sessionService={svc}
+        warnBeforeExpiryMs={120_000}
+        pollIntervalMs={1_000}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-timeout-modal')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Session expiring soon/i)).toBeInTheDocument();
+  });
+
+  it('calls extendPersistedSession when Extend is clicked', async () => {
+    const svc = mockConnectedService(30_000);
+    render(
+      <SessionTimeoutModal
+        sessionService={svc}
+        warnBeforeExpiryMs={120_000}
+        pollIntervalMs={500}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('session-timeout-modal-extend')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('session-timeout-modal-extend'));
+    expect(svc.extendPersistedSession).toHaveBeenCalled();
+  });
+
+  it('hides warning when Dismiss is clicked', async () => {
+    const svc = mockConnectedService(20_000);
+    render(
+      <SessionTimeoutModal
+        sessionService={svc}
+        warnBeforeExpiryMs={120_000}
+        pollIntervalMs={500}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('session-timeout-modal-dismiss')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('session-timeout-modal-dismiss'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('session-timeout-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  it('disconnects and shows expired when remaining is 0', async () => {
+    const svc = mockConnectedService(0);
+    render(
+      <SessionTimeoutModal
+        sessionService={svc}
+        warnBeforeExpiryMs={300_000}
+        pollIntervalMs={100}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/Session expired/i)).toBeInTheDocument(),
+    );
+    expect(svc.disconnect).toHaveBeenCalled();
+  });
+
+  it('invokes onReconnect from expired state', async () => {
+    const svc = mockConnectedService(0);
+    const onReconnect = vi.fn();
+    render(
+      <SessionTimeoutModal
+        sessionService={svc}
+        warnBeforeExpiryMs={300_000}
+        pollIntervalMs={100}
+        onReconnect={onReconnect}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('session-timeout-modal-reconnect')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('session-timeout-modal-reconnect'));
+    expect(onReconnect).toHaveBeenCalled();
+  });
+});

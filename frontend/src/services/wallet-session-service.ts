@@ -19,6 +19,15 @@ type Subscriber = (
 const DEFAULT_KEY = "stc_wallet_session_v1";
 const DEFAULT_EXPIRY = 1000 * 60 * 60 * 24 * 7; // 7 days
 
+/**
+ * Default lead time (ms) before persisted session expiry to show a warning modal.
+ * Safe default (no env reads); apps may pass a different threshold via modal props.
+ */
+export const WALLET_SESSION_WARN_BEFORE_EXPIRY_MS_DEFAULT = 5 * 60 * 1000; // 5 minutes
+
+/** How often the session timeout UI should poll remaining time (ms). */
+export const WALLET_SESSION_EXPIRY_POLL_MS_DEFAULT = 15_000;
+
 // Minimal adapter interface for injected wallet providers.
 export interface WalletProviderAdapter {
   isAvailable(): boolean;
@@ -232,6 +241,35 @@ export class WalletSessionService {
 
   public getMeta(): WalletSessionMeta | null {
     return this.meta;
+  }
+
+  /**
+   * Milliseconds until the persisted session row expires (from localStorage `storedAt` + expiry),
+   * or null if not connected or no persisted row.
+   */
+  public getRemainingPersistenceMs(): number | null {
+    if (this.state !== WalletSessionState.CONNECTED || !this.meta) {
+      return null;
+    }
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { storedAt?: number };
+      if (typeof parsed.storedAt !== "number") return null;
+      const expiresAt = parsed.storedAt + this.sessionExpiryMs;
+      return Math.max(0, expiresAt - Date.now());
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Refreshes persistence `storedAt` to now (extends wall-clock session validity).
+   */
+  public extendPersistedSession(): void {
+    if (!this.meta) return;
+    this.persist(this.meta);
+    this.notify();
   }
 
   private mapError(e: Error): Error {

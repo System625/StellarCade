@@ -1,0 +1,60 @@
+.session-timeout-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.session-timeout-modal__dialog {
+  --stm-bg: var(--stc-surface, #fff);
+  --stm-border: var(--stc-border, #ccc);
+  --stm-text: var(--stc-text, #111);
+
+  background: var(--stm-bg);
+  color: var(--stm-text);
+  border: 1px solid var(--stm-border);
+  border-radius: var(--stc-radius-md, 8px);
+  padding: 1.25rem 1.5rem;
+  max-width: 420px;
+  width: calc(100% - 2rem);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.session-timeout-modal__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.session-timeout-modal__body {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.session-timeout-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.session-timeout-modal__primary,
+.session-timeout-modal__secondary {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.session-timeout-modal__primary {
+  background: var(--stc-primary, #0d6efd);
+  color: #fff;
+  border: none;
+}
+
+.session-timeout-modal__secondary {
+  background: transparent;
+  border: 1px solid var(--stm-border);
+  color: var(--stm-text);
+}
