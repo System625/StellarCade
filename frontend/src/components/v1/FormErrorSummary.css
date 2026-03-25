@@ -1,0 +1,53 @@
+/**
+ * Themeable form error summary — uses CSS variables aligned with app tokens.
+ */
+.form-error-summary {
+  --form-error-bg: var(--stc-error-bg, rgba(220, 53, 69, 0.08));
+  --form-error-border: var(--stc-error-border, #dc3545);
+  --form-error-text: var(--stc-error-text, #842029);
+  --form-error-link: var(--stc-error-link, #0d6efd);
+  --form-error-radius: var(--stc-radius-md, 6px);
+  --form-error-padding: var(--stc-space-md, 12px);
+
+  border: 1px solid var(--form-error-border);
+  background: var(--form-error-bg);
+  color: var(--form-error-text);
+  border-radius: var(--form-error-radius);
+  padding: var(--form-error-padding);
+  margin-bottom: 1rem;
+}
+
+.form-error-summary__title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.form-error-summary__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.form-error-summary__item {
+  margin: 0.35rem 0;
+}
+
+.form-error-summary__link {
+  color: var(--form-error-link);
+  text-decoration: underline;
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+.form-error-summary__link:focus-visible {
+  outline: 2px solid var(--form-error-link);
+  outline-offset: 2px;
+}
+
+.form-error-summary__field {
+  text-transform: capitalize;
+}
+
+.form-error-summary__message {
+  display: inline;
+}
