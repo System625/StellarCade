@@ -19,7 +19,7 @@
 
 - **Smart Contracts**: Rust & Soroban SDK
 - **Backend**: Node.js, Express, PostgreSQL, Redis
-- **Frontend**: Vite + React (Coming Soon)
+- **Frontend**: Vite + React (TypeScript)
 - **Infrastructure**: Docker, GitHub Actions
 
 ## 🚀 Quick Start
@@ -30,44 +30,116 @@
 - [Node.js (v18+)](https://nodejs.org/)
 - [Docker](https://www.docker.com/)
 
-### Setup
+### Local Development Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/stellar/stellarcade.git
-   cd stellarcade
-   ```
-2. Install dependencies:
+For a complete local development environment:
 
-   ```bash
-   # Backend
-   cd backend && npm install
+```bash
+# Clone the repository
+git clone https://github.com/stellar/stellarcade.git
+cd stellarcade
 
-   # Contracts
-   cd ../contracts/prize-pool && cargo build
-   ```
+# Enable Git hooks (mirrors CI checks locally)
+git config core.hooksPath .githooks
 
-3. Run with Docker:
-   ```bash
-   docker-compose up -d
-   ```
+# Start all services (PostgreSQL, Redis, Backend)
+docker-compose up -d
+
+# Build contracts
+cd contracts && soroban contract build && cd ..
+
+# Set up backend
+cd backend && npm install && npm run migrate && cd ..
+
+# Set up frontend
+cd frontend && pnpm install && cd ..
+```
+
+See the complete [Setup Guide](docs/SETUP.md) for detailed instructions, verification steps, and troubleshooting.
+
+## 📁 Project Structure
+
+```
+stellarcade/
+├── contracts/          # Soroban smart contracts (Rust)
+│   ├── prize-pool/    # Prize pool management
+│   ├── coin-flip/     # Coin flip game
+│   ├── random-generator/  # Provably fair RNG
+│   └── ...
+├── backend/           # Node.js API server
+│   ├── src/          # Source code
+│   ├── migrations/   # Database migrations
+│   └── tests/        # API tests
+├── frontend/          # React + Vite frontend
+│   ├── src/          # React components
+│   └── tests/        # Frontend tests
+├── docs/             # Documentation
+└── scripts/          # Utility scripts
+```
 
 ## 📚 Documentation
 
-Detailed documentation can be found in the [docs/](docs/) folder:
+| Document                                   | Description                      |
+| ------------------------------------------ | -------------------------------- |
+| [Setup Guide](docs/SETUP.md)               | Complete local development setup |
+| [Architecture](docs/ARCHITECTURE.md)       | System design and components     |
+| [API Reference](docs/API_DOCUMENTATION.md) | REST API documentation           |
+| [Game Rules](docs/GAME_RULES.md)           | Game mechanics and rules         |
+| [Deployment](docs/DEPLOYMENT.md)           | Production deployment guide      |
+| [Contributing](CONTRIBUTING.md)            | How to contribute                |
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Game Rules](docs/GAME_RULES.md)
-- [API Reference](docs/API_DOCUMENTATION.md)
-- [Setup Guide](docs/SETUP.md)
+### Subsystem Documentation
+
+- [Backend](backend/README.md) - API server setup and development
+- [Frontend](frontend/README.md) - Frontend development guide
+- [Contracts](contracts/README.md) - Smart contract development
+
+## 🧪 Testing
+
+```bash
+# Run contract tests
+cd contracts && cargo test
+
+# Run backend tests
+cd backend && npm test
+
+# Run frontend tests
+cd frontend && pnpm test
+```
+
+## 🐳 Docker Commands
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+
+# Rebuild and restart
+docker-compose up -d --build
+```
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to get started.
+We welcome contributions! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Enable Git hooks (`git config core.hooksPath .githooks`)
+4. Make your changes and run tests
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## 🛡 Security
 
-For security concerns, please refer to our [SECURITY.md](SECURITY.md).
+For security concerns or to report vulnerabilities, please see our [SECURITY.md](SECURITY.md).
 
 ## 📄 License
 
@@ -78,6 +150,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Discord Placeholder](#)
 - [Twitter / X Placeholder](#)
 - [Stellar Developers Foundation](https://stellar.org/developers)
+
+## 🙏 Acknowledgments
+
+- Built on [Stellar](https://stellar.org) and [Soroban](https://soroban.stellar.org)
+- Inspired by the decentralized gaming movement
+- Created with ❤️ by the community
 
 ---
 
