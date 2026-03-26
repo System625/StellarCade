@@ -14,7 +14,7 @@ const isPositiveInteger = (value) => /^\d+$/.test(value) && Number(value) > 0;
 
 const isValidStellarNetwork = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
-  return ['testnet', 'public', 'mainnet', 'futurenet', 'sandbox', 'standalone'].includes(normalized);
+  return ['test', 'testnet', 'public', 'mainnet', 'futurenet', 'sandbox', 'standalone'].includes(normalized);
 };
 
 const collectValidationErrors = (env) => {
