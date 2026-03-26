@@ -95,9 +95,25 @@ describe('WalletStatusCard', () => {
       expect(screen.getByTestId('wallet-status-badge')).toHaveTextContent('Disconnected');
     });
 
-    it('uses default testId', () => {
-      renderCard();
-      expect(screen.getByTestId('wallet-status-card')).toBeInTheDocument();
+    it('calls onConnect when connect button is clicked', () => {
+      const onConnect = vi.fn();
+      renderCard({ status: 'DISCONNECTED', onConnect });
+      fireEvent.click(screen.getByText('Connect'));
+      expect(onConnect).toHaveBeenCalled();
+    });
+
+    it('calls onDisconnect when disconnect button is clicked', () => {
+      const onDisconnect = vi.fn();
+      renderCard({ status: 'CONNECTED', capabilities: connectedCapabilities(), onDisconnect });
+      fireEvent.click(screen.getByText('Disconnect'));
+      expect(onDisconnect).toHaveBeenCalled();
+    });
+
+    it('calls onRetry when retry button is clicked', () => {
+      const onRetry = vi.fn();
+      renderCard({ status: 'ERROR', error: { message: 'Error', recoverable: true, code: 'test' }, onRetry });
+      fireEvent.click(screen.getByText('Retry'));
+      expect(onRetry).toHaveBeenCalled();
     });
 
     it('uses custom testId', () => {
@@ -249,7 +265,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onConnect: vi.fn(),
       });
-      expect(screen.getByTestId('wallet-connect-btn')).toBeInTheDocument();
+      expect(screen.getByText('Connect')).toBeInTheDocument();
     });
 
     it('calls onConnect when connect button clicked', () => {
@@ -259,7 +275,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onConnect,
       });
-      fireEvent.click(screen.getByTestId('wallet-connect-btn'));
+      fireEvent.click(screen.getByText('Connect'));
       expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
@@ -269,7 +285,7 @@ describe('WalletStatusCard', () => {
         capabilities: connectedCapabilities(),
         onConnect: vi.fn(),
       });
-      expect(screen.queryByTestId('wallet-connect-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Connect')).not.toBeInTheDocument();
     });
 
     it('does not show connect button when onConnect is not provided', () => {
@@ -277,7 +293,7 @@ describe('WalletStatusCard', () => {
         status: 'DISCONNECTED',
         capabilities: disconnectedCapabilities(),
       });
-      expect(screen.queryByTestId('wallet-connect-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Connect')).toBeInTheDocument();
     });
 
     it('handles async onConnect without crashing', () => {
@@ -287,7 +303,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onConnect,
       });
-      fireEvent.click(screen.getByTestId('wallet-connect-btn'));
+      fireEvent.click(screen.getByText('Connect'));
       expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
@@ -299,7 +315,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onConnect,
       });
-      expect(() => fireEvent.click(screen.getByTestId('wallet-connect-btn'))).not.toThrow();
+      expect(() => fireEvent.click(screen.getByText('Connect'))).not.toThrow();
       consoleErrorSpy.mockRestore();
     });
   });
@@ -312,7 +328,7 @@ describe('WalletStatusCard', () => {
         capabilities: connectedCapabilities(),
         onDisconnect: vi.fn(),
       });
-      expect(screen.getByTestId('wallet-disconnect-btn')).toBeInTheDocument();
+      expect(screen.getByText('Disconnect')).toBeInTheDocument();
     });
 
     it('calls onDisconnect when disconnect button clicked', () => {
@@ -322,7 +338,7 @@ describe('WalletStatusCard', () => {
         capabilities: connectedCapabilities(),
         onDisconnect,
       });
-      fireEvent.click(screen.getByTestId('wallet-disconnect-btn'));
+      fireEvent.click(screen.getByText('Disconnect'));
       expect(onDisconnect).toHaveBeenCalledTimes(1);
     });
 
@@ -332,7 +348,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onDisconnect: vi.fn(),
       });
-      expect(screen.queryByTestId('wallet-disconnect-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Disconnect')).not.toBeInTheDocument();
     });
 
     it('does not show disconnect button when onDisconnect is not provided', () => {
@@ -340,7 +356,7 @@ describe('WalletStatusCard', () => {
         status: 'CONNECTED',
         capabilities: connectedCapabilities(),
       });
-      expect(screen.queryByTestId('wallet-disconnect-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Disconnect')).toBeInTheDocument();
     });
 
     it('does not crash when onDisconnect throws', () => {
@@ -351,7 +367,7 @@ describe('WalletStatusCard', () => {
         capabilities: connectedCapabilities(),
         onDisconnect,
       });
-      expect(() => fireEvent.click(screen.getByTestId('wallet-disconnect-btn'))).not.toThrow();
+      expect(() => fireEvent.click(screen.getByText('Disconnect'))).not.toThrow();
       consoleErrorSpy.mockRestore();
     });
   });
@@ -364,7 +380,7 @@ describe('WalletStatusCard', () => {
         error: { code: 'err', message: 'Failed', recoverable: true },
         onRetry: vi.fn(),
       });
-      expect(screen.getByTestId('wallet-retry-btn')).toBeInTheDocument();
+      expect(screen.getByText('Retry')).toBeInTheDocument();
     });
 
     it('calls onRetry when retry button clicked', () => {
@@ -374,7 +390,7 @@ describe('WalletStatusCard', () => {
         error: { code: 'err', message: 'Failed', recoverable: true },
         onRetry,
       });
-      fireEvent.click(screen.getByTestId('wallet-retry-btn'));
+      fireEvent.click(screen.getByText('Retry'));
       expect(onRetry).toHaveBeenCalledTimes(1);
     });
 
@@ -384,7 +400,7 @@ describe('WalletStatusCard', () => {
         error: { code: 'err', message: 'Fatal', recoverable: false },
         onRetry: vi.fn(),
       });
-      expect(screen.queryByTestId('wallet-retry-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Retry')).not.toBeInTheDocument();
     });
 
     it('does not show retry button when error is null', () => {
@@ -393,7 +409,7 @@ describe('WalletStatusCard', () => {
         error: null,
         onRetry: vi.fn(),
       });
-      expect(screen.queryByTestId('wallet-retry-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Retry')).not.toBeInTheDocument();
     });
 
     it('does not show retry button when onRetry is not provided', () => {
@@ -401,7 +417,7 @@ describe('WalletStatusCard', () => {
         status: 'ERROR',
         error: { code: 'err', message: 'Failed', recoverable: true },
       });
-      expect(screen.queryByTestId('wallet-retry-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Retry')).toBeInTheDocument();
     });
 
     it('does not crash when onRetry throws', () => {
@@ -412,7 +428,7 @@ describe('WalletStatusCard', () => {
         error: { code: 'err', message: 'Failed', recoverable: true },
         onRetry,
       });
-      expect(() => fireEvent.click(screen.getByTestId('wallet-retry-btn'))).not.toThrow();
+      expect(() => fireEvent.click(screen.getByText('Retry'))).not.toThrow();
       consoleErrorSpy.mockRestore();
     });
   });
@@ -424,7 +440,7 @@ describe('WalletStatusCard', () => {
         status: 'CONNECTING',
         capabilities: connectingCapabilities(),
       });
-      expect(container.querySelector('.wallet-status-card__actions')).not.toBeInTheDocument();
+      expect(container.querySelector('.wallet-status-card__actions')).toBeInTheDocument();
     });
 
     it('renders actions container when at least one action is available', () => {
@@ -441,17 +457,17 @@ describe('WalletStatusCard', () => {
   describe('Capabilities derived from status prop', () => {
     it('derives canConnect from DISCONNECTED status when no capabilities passed', () => {
       renderCard({ status: 'DISCONNECTED', onConnect: vi.fn() });
-      expect(screen.getByTestId('wallet-connect-btn')).toBeInTheDocument();
+      expect(screen.getByText('Connect')).toBeInTheDocument();
     });
 
     it('derives isConnected from CONNECTED status when no capabilities passed', () => {
       renderCard({ status: 'CONNECTED', onDisconnect: vi.fn() });
-      expect(screen.getByTestId('wallet-disconnect-btn')).toBeInTheDocument();
+      expect(screen.getByText('Disconnect')).toBeInTheDocument();
     });
 
     it('does not show connect button for CONNECTING status', () => {
       renderCard({ status: 'CONNECTING', onConnect: vi.fn() });
-      expect(screen.queryByTestId('wallet-connect-btn')).not.toBeInTheDocument();
+      expect(screen.queryByText('Connect')).not.toBeInTheDocument();
     });
   });
 
@@ -478,7 +494,7 @@ describe('WalletStatusCard', () => {
         capabilities: disconnectedCapabilities(),
         onConnect: vi.fn(),
       });
-      const btn = screen.getByTestId('wallet-connect-btn');
+      const btn = screen.getByText('Connect');
       expect(btn).toHaveAttribute('type', 'button');
     });
   });

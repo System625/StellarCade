@@ -68,7 +68,7 @@ function isSafeInteger(n: number): boolean {
 
 /** Stellar public key is 56 chars, base32; we only need to guard length and non-empty. */
 function isAddressLike(s: string): boolean {
-  return typeof s === "string" && s.length >= 12 && s.length <= 56 && /^[A-Z2-7]+$/.test(s);
+  return typeof s === "string" && s.length >= 12 && s.length <= 64 && /^[A-Z0-9]+$/.test(s);
 }
 
 // ── Amount ───────────────────────────────────────────────────────────────────────
@@ -128,7 +128,6 @@ export function formatAmount(
     minimumFractionDigits: 0,
     maximumFractionDigits: prec,
   };
-  if (locale) opts.locale = locale;
 
   const formatted = new Intl.NumberFormat(locale ?? undefined, opts).format(num);
   return symbol ? `${formatted} ${symbol}`.trim() : formatted;

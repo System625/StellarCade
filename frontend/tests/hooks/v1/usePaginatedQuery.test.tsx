@@ -8,7 +8,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import type {
   PaginationState,
-  PaginatedResult,
   QueryExecutor,
 } from "../../../src/types/pagination";
 import { usePaginatedQuery } from "../../../src/hooks/v1/usePaginatedQuery";

@@ -1,4 +1,3 @@
-import React from 'react';
 import { CoinFlipGame, CoinFlipGameState, CoinFlipSide } from '../../types/contracts/coinFlip';
 import { formatAmount } from '../../utils/v1/formatters';
 import { LoadingState, SkeletonCard } from './LoadingSkeletonSet';

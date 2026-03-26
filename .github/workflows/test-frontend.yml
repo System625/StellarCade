@@ -25,5 +25,8 @@ jobs:
       - name: Run Linter
         run: cd frontend && npm run lint
 
+      - name: Run Typecheck
+        run: cd frontend && npm run typecheck
+
       - name: Run Tests
-        run: cd frontend && npm run test
+        run: cd frontend && npm run test:unit

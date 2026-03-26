@@ -6,7 +6,8 @@
  * made.
  */
 
-vi.mock("@stellar/stellar-sdk", async () => await import("../__mocks__/stellar-sdk"));
+import * as stellarSdkMock from "../__mocks__/stellar-sdk";
+vi.mock("@stellar/stellar-sdk", () => stellarSdkMock);
 
 import { SorobanContractClient } from "../../src/services/soroban-contract-client";
 import { ContractAddressRegistry } from "../../src/store/contractAddressRegistry";

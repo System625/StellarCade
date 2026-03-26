@@ -195,7 +195,7 @@ describe('TransactionOrchestrator', () => {
     }
 
     expect(resolveSubmit).not.toBeNull();
-    (resolveSubmit as (v: { txHash: string; data: null }) => void)({ txHash: 'done', data: null });
+    (resolveSubmit as unknown as (v: { txHash: string; data: null }) => void)({ txHash: 'done', data: null });
 
     await firstPromise;
   });

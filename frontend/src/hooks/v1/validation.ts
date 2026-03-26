@@ -9,7 +9,6 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type {
-  ValidationResult,
   ValidationError,
   WagerBounds,
   StringConstraints,
@@ -18,11 +17,8 @@ import type {
 import {
   validateWager,
   validateGameId,
-  validateBadgeId,
   validateEnum,
   validateStellarAddress,
-  validateContractAddress,
-  validateSha256Hash,
   validateString,
   validateNumber,
   DEFAULT_WAGER_BOUNDS,

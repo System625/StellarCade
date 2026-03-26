@@ -154,17 +154,69 @@ function WalletStatusCardSkeleton({
         />
       </div>
 
-      {/* Action placeholder */}
+      {/* Action button */}
       <div className="wallet-status-card__actions">
-        <SkeletonBase
-          className="wallet-status-card__skeleton-btn"
-          height="34px"
-          width="90px"
-          borderRadius="0.375rem"
-        />
+        <SkeletonBase height="36px" width="100px" />
       </div>
     </div>
   );
+}
+
+function ActionButton({
+  status,
+  capabilities,
+  error,
+  onConnect,
+  onDisconnect,
+  onRetry,
+}: WalletStatusCardProps): React.JSX.Element | null {
+  const effectiveCapabilities = capabilities ?? deriveCapabilities(status ?? 'DISCONNECTED');
+
+  const handleConnect = useCallback(() => safeCall(onConnect, 'onConnect'), [onConnect]);
+  const handleDisconnect = useCallback(() => safeCall(onDisconnect, 'onDisconnect'), [onDisconnect]);
+  const handleRetry = useCallback(() => safeCall(onRetry, 'onRetry'), [onRetry]);
+
+  if (effectiveCapabilities.isConnected) {
+    return (
+      <button
+        className="wallet-status-card__btn wallet-status-card__btn--disconnect"
+        onClick={handleDisconnect}
+        data-testid="wallet-action-btn"
+        type="button"
+      >
+        Disconnect
+      </button>
+    );
+  }
+
+  if (error && error.recoverable) {
+    return (
+      <button
+        className="wallet-status-card__btn wallet-status-card__btn--retry"
+        onClick={handleRetry}
+        data-testid="wallet-action-btn"
+        type="button"
+      >
+        Retry
+      </button>
+    );
+  }
+
+  if (effectiveCapabilities.canConnect) {
+    return (
+      <button
+        className="wallet-status-card__btn wallet-status-card__btn--connect"
+        onClick={handleConnect}
+        disabled={effectiveCapabilities.isConnecting || effectiveCapabilities.isReconnecting}
+        data-testid="wallet-action-btn"
+        type="button"
+      >
+        {effectiveCapabilities.isConnecting || effectiveCapabilities.isReconnecting ? 'Connecting...' : 'Connect'}
+      </button>
+    );
+  }
+
+  return null;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -228,41 +280,10 @@ export const WalletStatusCard: React.FC<WalletStatusCardProps> = ({
   const sanitizedProviderName =
     provider?.name ? sanitize(provider.name) : null;
 
-  // ── Action guards ────────────────────────────────────────────────────────────
-  const canConnect =
-    capabilities.canConnect && typeof onConnect === 'function';
-  const canDisconnect =
-    capabilities.isConnected && typeof onDisconnect === 'function';
-  const canRetry =
-    error !== null &&
-    error.recoverable &&
-    typeof onRetry === 'function';
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const handleConnect = useCallback(() => {
-    if (!canConnect) return;
-    safeCall(onConnect, 'onConnect');
-  }, [canConnect, onConnect]);
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const handleDisconnect = useCallback(() => {
-    if (!canDisconnect) return;
-    safeCall(onDisconnect, 'onDisconnect');
-  }, [canDisconnect, onDisconnect]);
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const handleRetry = useCallback(() => {
-    if (!canRetry) return;
-    safeCall(onRetry, 'onRetry');
-  }, [canRetry, onRetry]);
-
   // ── Render ───────────────────────────────────────────────────────────────────
   const containerClass = ['wallet-status-card', className]
     .filter(Boolean)
     .join(' ');
-
-  const showActions = canConnect || canDisconnect || canRetry;
 
   return (
     <div
@@ -339,42 +360,16 @@ export const WalletStatusCard: React.FC<WalletStatusCardProps> = ({
       )}
 
       {/* ── Actions ── */}
-      {showActions && (
-        <div className="wallet-status-card__actions">
-          {canConnect && (
-            <button
-              type="button"
-              className="wallet-status-card__action-btn wallet-status-card__action-btn--connect"
-              onClick={handleConnect}
-              data-testid="wallet-connect-btn"
-            >
-              Connect
-            </button>
-          )}
-
-          {canDisconnect && (
-            <button
-              type="button"
-              className="wallet-status-card__action-btn wallet-status-card__action-btn--disconnect"
-              onClick={handleDisconnect}
-              data-testid="wallet-disconnect-btn"
-            >
-              Disconnect
-            </button>
-          )}
-
-          {canRetry && (
-            <button
-              type="button"
-              className="wallet-status-card__action-btn wallet-status-card__action-btn--retry"
-              onClick={handleRetry}
-              data-testid="wallet-retry-btn"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
+      <div className="wallet-status-card__actions">
+        <ActionButton
+          status={status}
+          capabilities={capabilities}
+          error={error}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+          onRetry={onRetry}
+        />
+      </div>
     </div>
   );
 };

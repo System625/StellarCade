@@ -58,13 +58,19 @@ export class Account {
 
 // ── Transaction builder mock ──────────────────────────────────────────────────
 
+export class Transaction {
+  constructor(_source: unknown, _opts: unknown) {
+  }
+  toXDR(): string {
+    return "mock-tx-xdr";
+  }
+}
+
 export class TransactionBuilder {
   private ops: unknown[] = [];
 
-  constructor(
-    private readonly _source: Account,
-    private readonly _opts: unknown,
-  ) {}
+  constructor(_source: Account, _opts: unknown) {
+  }
 
   addOperation(op: unknown): this {
     this.ops.push(op);
@@ -185,7 +191,7 @@ export const SorobanRpc = {
     },
   },
 
-  assembleTransaction: (tx: unknown, _simResult: unknown) => ({
+  assembleTransaction: (_tx: unknown, _simResult: unknown) => ({
     build: () => ({
       toXDR: () => "mock-assembled-tx-xdr",
     }),

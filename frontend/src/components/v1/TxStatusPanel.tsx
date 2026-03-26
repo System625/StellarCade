@@ -44,7 +44,6 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
 
   const isFailed = phase === TxPhase.FAILED;
-  const isConfirmed = phase === TxPhase.CONFIRMED;
   const isPending = phase === TxPhase.PENDING || phase === TxPhase.SUBMITTED;
   const isIdle = phase === TxPhase.IDLE;
 

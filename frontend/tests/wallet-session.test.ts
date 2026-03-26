@@ -91,6 +91,7 @@ describe("WalletSessionService", () => {
   });
 
   it("stale session is removed", async () => {
+    vi.useFakeTimers();
     const svc = new WalletSessionService({
       supportedNetworks: ["TESTNET"],
       sessionExpiryMs: 1,
@@ -99,12 +100,13 @@ describe("WalletSessionService", () => {
     svc.setProviderAdapter(adapter as any);
     await svc.connect({ network: "TESTNET" });
     // wait for expiry
-    await new Promise((r) => setTimeout(r, 5));
+    await vi.advanceTimersByTimeAsync(5);
     const svc2 = new WalletSessionService({
       supportedNetworks: ["TESTNET"],
       sessionExpiryMs: 1,
     });
     svc2.setProviderAdapter(adapter as any);
     await expect(svc2.reconnect()).rejects.toBeInstanceOf(StaleSessionError);
+    vi.useRealTimers();
   });
 });

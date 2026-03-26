@@ -9,8 +9,9 @@
  * - Accessibility (ARIA attributes, semantic HTML)
  */
 
-import React from "react";
+
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { vi } from "vitest";
 
 import NetworkGuardBanner from "@/components/v1/NetworkGuardBanner";
 
@@ -156,7 +157,7 @@ describe("NetworkGuardBanner", () => {
 
   describe("Network Switch Action", () => {
     it("should show switch network button when onSwitchNetwork is provided", () => {
-      const mockSwitch = vi.fn<void | Promise<void>, []>();
+      const mockSwitch = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -175,10 +176,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should call onSwitchNetwork when switch button is clicked", async () => {
-      const mockCallback = vi.fn<void, []>() as vi.Mock<
-        void | Promise<void>,
-        []
-      >;
+      const mockCallback = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -195,10 +193,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should use custom action label", () => {
-      const mockSwitch = vi.fn<void, []>() as vi.Mock<
-        void | Promise<void>,
-        []
-      >;
+      const mockSwitch = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -213,9 +208,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should show loading state while switching network", async () => {
-      const mockCallback = vi.fn<Promise<void>, []>(
-        () => new Promise((resolve) => setTimeout(resolve, 100)),
-      ) as vi.Mock<void | Promise<void>, []>;
+      const mockCallback = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -243,9 +236,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should disable switch button while loading", async () => {
-      const mockCallback = vi.fn<Promise<void>, []>(
-        () => new Promise((resolve) => setTimeout(resolve, 50)),
-      ) as vi.Mock<void | Promise<void>, []>;
+      const mockCallback = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -264,10 +255,8 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should handle errors in onSwitchNetwork gracefully", async () => {
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation();
-      const mockCallback = vi.fn(() =>
-        Promise.reject(new Error("Network switch failed")),
-      ) as vi.Mock<void | Promise<void>, []>;
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const mockCallback = vi.fn().mockRejectedValue(new Error("Switch failed"));
 
       render(
         <NetworkGuardBanner
@@ -288,10 +277,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should handle synchronous onSwitchNetwork callbacks", async () => {
-      const mockCallback = vi.fn<void, []>() as vi.Mock<
-        void | Promise<void>,
-        []
-      >;
+      const mockCallback = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -459,7 +445,7 @@ describe("NetworkGuardBanner", () => {
 
   describe("Combination Scenarios", () => {
     it("should handle switch + dismiss together", async () => {
-      const mockSwitch = vi.fn<void | Promise<void>, []>();
+      const mockSwitch = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -505,7 +491,7 @@ describe("NetworkGuardBanner", () => {
 
   describe("Accessibility", () => {
     it("should have proper ARIA attributes", () => {
-      const mockSwitch = vi.fn<void | Promise<void>, []>();
+      const mockSwitch = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}
@@ -523,9 +509,7 @@ describe("NetworkGuardBanner", () => {
     });
 
     it("should set aria-busy on switch button during loading", async () => {
-      const mockCallback = vi.fn<Promise<void>, []>(
-        () => new Promise((resolve) => setTimeout(resolve, 50)),
-      ) as vi.Mock<void | Promise<void>, []>;
+      const mockCallback = vi.fn();
       render(
         <NetworkGuardBanner
           {...mockDefaultProps}

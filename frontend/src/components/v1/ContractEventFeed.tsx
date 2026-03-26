@@ -201,8 +201,8 @@ const EventRow: React.FC<EventRowProps> = ({ event, onClick, severity, testId })
   );
 
   const timestamp =
-    event.timestamp instanceof Date
-      ? event.timestamp
+    (event.timestamp as any) instanceof Date
+      ? (event.timestamp as any)
       : new Date(event.timestamp);
 
   const timeLabel = isNaN(timestamp.getTime())
@@ -379,8 +379,8 @@ export const ContractEventFeed: React.FC<ContractEventFeedProps> = ({
         // Time window filter
         if (timeWindowMs !== undefined && timeWindowMs > 0) {
           const ts =
-            event.timestamp instanceof Date
-              ? event.timestamp.getTime()
+            (event.timestamp as any) instanceof Date
+              ? (event.timestamp as any).getTime()
               : typeof event.timestamp === 'string' ||
                   typeof event.timestamp === 'number'
                 ? new Date(event.timestamp).getTime()

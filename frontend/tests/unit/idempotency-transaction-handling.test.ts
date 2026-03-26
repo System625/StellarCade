@@ -19,7 +19,6 @@ import {
 } from '../../src/types/idempotency';
 import type {
   IdempotencyKeyParams,
-  StorageConfig,
 } from '../../src/types/idempotency';
 
 describe('IdempotencyTransactionHandler', () => {

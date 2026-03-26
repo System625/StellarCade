@@ -4,7 +4,6 @@ import type { UseContractEventsOptions, UseContractEventsResult, ContractEvent }
 export function useContractEvents<T = unknown>({
   contractId,
   autoStart = true,
-  pollInterval = 5000,
 }: UseContractEventsOptions): UseContractEventsResult<T> {
   const [events, setEvents] = useState<ContractEvent<T>[]>([]);
   const [isListening, setIsListening] = useState(false);

@@ -102,7 +102,7 @@ describe('EmptyStateBlock Utilities', () => {
     });
 
     it('should catch and log errors without throwing', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const callback = vi.fn(() => {
         throw new Error('Test error');
       });
@@ -119,7 +119,7 @@ describe('EmptyStateBlock Utilities', () => {
     });
 
     it('should catch async errors without throwing', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const callback = vi.fn().mockRejectedValue(new Error('Async error'));
       const safe = safeCallback(callback, 'async-action');
       
@@ -413,7 +413,7 @@ describe('EmptyStateBlock Utilities', () => {
     });
 
     it('should filter out actions with missing label', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const actions = [
         { label: 'Valid', onClick: vi.fn() },
         { label: '', onClick: vi.fn() },
@@ -429,7 +429,7 @@ describe('EmptyStateBlock Utilities', () => {
     });
 
     it('should filter out actions with invalid onClick', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const actions = [
         { label: 'Valid', onClick: vi.fn() },
         { label: 'Invalid', onClick: 'not a function' as any },
@@ -445,7 +445,7 @@ describe('EmptyStateBlock Utilities', () => {
     });
 
     it('should filter out actions with null onClick', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const actions = [
         { label: 'Valid', onClick: vi.fn() },
         { label: 'Invalid', onClick: null as any },

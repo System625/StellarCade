@@ -11,8 +11,8 @@
  *  - Snapshot: stable header snapshot
  */
 
-import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ContractEventFeed } from '@/components/v1/ContractEventFeed';
 import type { ContractEventFeedProps } from '@/components/v1/ContractEventFeed';
 import type { ContractEvent } from '@/types/contracts/events';
@@ -73,10 +73,9 @@ function makeEvent(overrides: Partial<ContractEvent> = {}): ContractEvent {
     id,
     type: 'coin_flip',
     contractId: 'CAAAA1111',
-    timestamp: new Date('2025-01-01T12:00:00Z'),
-    topics: [],
-    value: null,
-    ...overrides,
+    timestamp: new Date('2025-01-01T12:00:00Z').toISOString(),
+    data: null,
+      ...overrides,
   };
 }
 
@@ -203,8 +202,8 @@ describe('ContractEventFeed — filters', () => {
   it('filters by timeWindowMs, removing old events', () => {
     const now = Date.now();
     mockEvents = [
-      makeEvent({ id: 'recent', timestamp: new Date(now - 1000) }),
-      makeEvent({ id: 'old',    timestamp: new Date(now - 999_999) }),
+      makeEvent({ id: 'recent', timestamp: new Date(now - 1000).toISOString() }),
+      makeEvent({ id: 'old',    timestamp: new Date(now - 999_999).toISOString() }),
     ];
     renderFeed({ timeWindowMs: 5000 });
     expect(screen.getByTestId('contract-event-feed-row-recent')).toBeInTheDocument();
@@ -358,7 +357,7 @@ describe('ContractEventFeed — edge cases', () => {
   });
 
   it('handles event with invalid timestamp gracefully', () => {
-    mockEvents = [makeEvent({ id: 'bad-ts', timestamp: new Date('invalid') })];
+    mockEvents = [makeEvent({ id: 'bad-ts', timestamp: 'invalid' })];
     renderFeed();
     expect(screen.getByTestId('contract-event-feed-row-bad-ts')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();

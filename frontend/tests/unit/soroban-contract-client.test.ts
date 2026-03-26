@@ -4,7 +4,8 @@
  * All network calls are mocked; no real Soroban RPC is contacted.
  */
 
-vi.mock("@stellar/stellar-sdk", async () => await import("../__mocks__/stellar-sdk"));
+import * as stellarSdkMock from "../__mocks__/stellar-sdk";
+vi.mock("@stellar/stellar-sdk", () => stellarSdkMock);
 
 import {
   devClearContractSimResults,

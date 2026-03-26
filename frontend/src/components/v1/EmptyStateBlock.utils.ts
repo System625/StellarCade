@@ -122,7 +122,8 @@ export function getErrorConfig(error: AppError): Partial<VariantConfig> {
   const severityIcons: Record<string, string> = {
     [ErrorSeverity.RETRYABLE]: '🔄',
     [ErrorSeverity.USER_ACTIONABLE]: '⚠️',
-    [(ErrorSeverity as any).TERMINAL]: "❌",
+    [ErrorSeverity.TERMINAL]: '❌',
+    [ErrorSeverity.FATAL]: '❌',
   };
 
   return {
@@ -150,12 +151,11 @@ export function getErrorTitle(error: AppError): string {
   if (error.severity === ErrorSeverity.USER_ACTIONABLE) {
     return "Action Required";
   }
-
-  // For fatal errors, be clear but not alarming
-  if (error.severity === ErrorSeverity.TERMINAL) {
-    return "Unable to Complete";
+  // For terminal or fatal errors, be clear but not alarming
+  if (error.severity === ErrorSeverity.TERMINAL || error.severity === ErrorSeverity.FATAL) {
+    return 'Unable to Complete';
   }
-  
+
   // Fallback
   return 'Something went wrong';
 }

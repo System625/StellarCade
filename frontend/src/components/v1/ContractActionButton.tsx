@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AppError } from '../../types/errors';
 import { toAppError } from '../../utils/v1/errorMapper';
 import { ErrorNotice } from './ErrorNotice';

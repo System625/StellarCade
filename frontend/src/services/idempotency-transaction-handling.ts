@@ -42,8 +42,6 @@ import { ErrorDomain, ErrorSeverity } from '../types/errors';
 const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_STORAGE_PREFIX = 'stellarcade_idempotency';
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_RECOVERY_TIMEOUT_MS = 30_000; // 30 seconds
-const DEFAULT_RECOVERY_POLL_INTERVAL_MS = 2_000; // 2 seconds
 
 // ── Storage Abstraction ────────────────────────────────────────────────────
 

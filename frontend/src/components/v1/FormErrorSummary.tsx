@@ -5,7 +5,7 @@
  * keyboard-friendly jump links to matching field elements by id.
  */
 
-import React, { useCallback, useId, useState } from 'react';
+import React, { useCallback, useId } from 'react';
 
 import './FormErrorSummary.css';
 

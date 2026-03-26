@@ -32,10 +32,17 @@ function mockFetchSequence(responses: Array<{ status: number; body: unknown }>):
   global.fetch = mock;
 }
 
-function mockFetchNetworkError(times = 1): void {
-  let mock = vi.fn();
+function mockFetchNetworkError(times = 1, successBody?: unknown): void {
+  const mock = vi.fn();
   for (let i = 0; i < times; i++) {
-    mock = mock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+  }
+  if (successBody !== undefined) {
+    mock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => successBody,
+    } as Response);
   }
   global.fetch = mock;
 }
@@ -58,6 +65,7 @@ afterEach(() => {
 
 describe('ApiClient — happy path', () => {
   it('getGames returns typed game list', async () => {
+    mockFetchNetworkError(0); // initialize global.fetch
     const games = [{ id: '1', name: 'Coin Flip', status: 'active' }];
     mockFetch(200, games);
 
@@ -143,7 +151,7 @@ describe('ApiClient — auth propagation', () => {
     const client = new ApiClient({ sessionStore: makeSessionStore('my-token') });
     await client.playGame({ gameId: 'game-1' });
 
-    const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1]?.headers as Record<string, string>;
+    const calledHeaders = (global.fetch as any).mock.calls[0][1]?.headers as Record<string, string>;
     expect(calledHeaders['Authorization']).toBe('Bearer my-token');
   });
 

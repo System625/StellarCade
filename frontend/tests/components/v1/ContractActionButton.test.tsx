@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ContractActionButton } from '../../../src/components/v1/ContractActionButton';
 

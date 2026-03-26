@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CoinFlipResultCard } from '../../../src/components/v1/CoinFlipResultCard';
 import { CoinFlipGame, CoinFlipGameState, CoinFlipSide } from '../../../src/types/contracts/coinFlip';

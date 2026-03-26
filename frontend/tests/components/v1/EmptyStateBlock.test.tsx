@@ -9,7 +9,7 @@
  * - Edge cases and error handling
  */
 
-import React from 'react';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { EmptyStateBlock } from '../../../src/components/v1/EmptyStateBlock';
@@ -315,7 +315,7 @@ describe('EmptyStateBlock', () => {
     });
 
     it('should filter out actions with invalid callbacks', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const validAction = { label: 'Valid', onClick: vi.fn() };
       const invalidAction = { label: 'Invalid', onClick: 'not a function' as any };
       
@@ -334,7 +334,7 @@ describe('EmptyStateBlock', () => {
     });
 
     it('should filter out actions with missing labels', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const validAction = { label: 'Valid', onClick: vi.fn() };
       const invalidAction = { label: '', onClick: vi.fn() };
       
@@ -352,7 +352,7 @@ describe('EmptyStateBlock', () => {
     });
 
     it('should not crash when action callback throws error', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const handleClick = vi.fn(() => {
         throw new Error('Action error');
       });

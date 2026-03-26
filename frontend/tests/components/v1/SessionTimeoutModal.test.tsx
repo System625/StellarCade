@@ -6,7 +6,7 @@ import { SessionTimeoutModal } from '@/components/v1/SessionTimeoutModal';
 import WalletSessionService from '@/services/wallet-session-service';
 import { WalletSessionState } from '@/types/wallet-session';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
+
 
 const meta = {
   provider: { id: 't', name: 'Test' },

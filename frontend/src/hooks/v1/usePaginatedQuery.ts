@@ -91,7 +91,6 @@ import {
   getPreviousPage,
   persistPaginationState,
   restorePaginationState,
-  clearPersistedPaginationState,
 } from "../../utils/v1/usePaginatedQuery";
 
 /**
@@ -285,7 +284,7 @@ export function usePaginatedQuery<T>(
   }, [state]);
 
   const setPage = useCallback(async (newPage: number): Promise<void> => {
-    if (!isValidPage(newPage)) {
+    if (typeof newPage !== "number" || !Number.isInteger(newPage) || newPage < 1) {
       return; // silently ignore invalid page numbers
     }
 
@@ -367,13 +366,6 @@ export function usePaginatedQuery<T>(
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/**
- * Checks if a value is a valid page number.
- */
-function isValidPage(page: unknown): boolean {
-  return typeof page === "number" && Number.isInteger(page) && page >= 1;
-}
 
 /**
  * Deep equality check for pagination states.

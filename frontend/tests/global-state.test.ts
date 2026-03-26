@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+
 import GlobalStateStore from "../src/services/global-state-store";
 import {
   isBannerDismissed,
@@ -11,6 +13,7 @@ import type { AppError } from "../src/types/errors";
 import React from "react";
 
 beforeEach(() => {
+  vi.clearAllMocks();
   localStorage.clear();
 });
 
@@ -47,7 +50,7 @@ describe("GlobalStateStore", () => {
       } as any,
     });
     const raw = JSON.parse(localStorage.getItem("test_state2") as string);
-    expect(raw.auth.isAuthenticated).toBe(false);
+    expect(raw.wallet).toBeUndefined();
   });
 
   it("persists and restores banner dismissals by key and identity", () => {

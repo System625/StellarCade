@@ -33,6 +33,7 @@ export const ErrorSeverity = {
   USER_ACTIONABLE: 'user_actionable',
   /** Non-recoverable — no retry or user action will resolve it. */
   TERMINAL: 'terminal',
+  FATAL: 'fatal',
 } as const;
 
 export type ErrorSeverity = (typeof ErrorSeverity)[keyof typeof ErrorSeverity];
@@ -238,6 +239,14 @@ export class SorobanClientError extends Error {
     return new SorobanClientError({
       code: SorobanErrorCode.ContractAddressNotFound,
       message: `Contract address for "${contractName}" is not set in the registry.`,
+      retryable: false,
+    });
+  }
+
+  static userRejected(): SorobanClientError {
+    return new SorobanClientError({
+      code: SorobanErrorCode.UserRejected,
+      message: "Transaction was rejected by the user.",
       retryable: false,
     });
   }
