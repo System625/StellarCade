@@ -22,6 +22,7 @@ pub enum EscrowStatus {
     Active,
     Released,
     Cancelled,
+    Recovered,
 }
 
 #[contracttype]
@@ -32,6 +33,7 @@ pub struct EscrowState {
     pub payee: Address,
     pub amount: i128,
     pub terms_hash: Symbol,
+    pub expiry: u64,
     pub status: EscrowStatus,
 }
 
@@ -44,6 +46,15 @@ pub struct EscrowCreated {
     pub payee: Address,
     pub amount: i128,
     pub terms_hash: Symbol,
+    pub expiry: u64,
+}
+
+#[contractevent]
+pub struct EscrowRecovered {
+    #[topic]
+    pub escrow_id: u64,
+    pub admin: Address,
+    pub amount: i128,
 }
 
 #[contractevent]
@@ -85,6 +96,7 @@ impl EscrowVault {
         payee: Address,
         amount: i128,
         terms_hash: Symbol,
+        expiry: u64,
     ) -> u64 {
         assert!(amount > 0, "Amount must be positive");
         payer.require_auth();
@@ -111,11 +123,12 @@ impl EscrowVault {
             payee: payee.clone(),
             amount,
             terms_hash: terms_hash.clone(),
+            expiry,
             status: EscrowStatus::Active,
         };
         env.storage().persistent().set(&DataKey::Escrow(escrow_id), &state);
 
-        EscrowCreated { escrow_id, payer, payee, amount, terms_hash }.publish(&env);
+        EscrowCreated { escrow_id, payer, payee, amount, terms_hash, expiry }.publish(&env);
 
         escrow_id
     }
@@ -190,6 +203,48 @@ impl EscrowVault {
         EscrowCancelled { escrow_id, payer: state.payer, amount: state.amount }.publish(&env);
     }
 
+    /// Recover funds from an expired escrow. Admin-only.
+    pub fn recover_escrow(env: Env, escrow_id: u64) {
+        let admin: Address =
+            env.storage().instance().get(&DataKey::Admin).expect("Not initialized");
+        admin.require_auth();
+
+        let mut state: EscrowState = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .expect("Escrow not found");
+
+        assert!(
+            state.status == EscrowStatus::Active,
+            "Escrow is not active"
+        );
+
+        assert!(
+            env.ledger().timestamp() >= state.expiry,
+            "Escrow has not expired yet"
+        );
+
+        state.status = EscrowStatus::Recovered;
+        env.storage().persistent().set(&DataKey::Escrow(escrow_id), &state);
+
+        let token_addr: Address =
+            env.storage().instance().get(&DataKey::Token).expect("Not initialized");
+        let token_client = token::Client::new(&env, &token_addr);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &state.payer,
+            &state.amount,
+        );
+
+        EscrowRecovered {
+            escrow_id,
+            admin,
+            amount: state.amount,
+        }
+        .publish(&env);
+    }
+
     /// Read the state of an escrow.
     pub fn escrow_state(env: Env, escrow_id: u64) -> EscrowState {
         env.storage()
@@ -205,7 +260,7 @@ mod test {
     use super::*;
     use soroban_sdk::{
         symbol_short,
-        testutils::{Address as _},
+        testutils::{Address as _, Ledger},
         token::{Client as TokenClient, StellarAssetClient},
         Env,
     };
@@ -234,13 +289,14 @@ mod test {
         let client = EscrowVaultClient::new(&env, &contract_id);
 
         client.init(&admin, &token_id);
-        let id = client.create_escrow(&payer, &payee, &500, &symbol_short!("HASH1"));
+        let id = client.create_escrow(&payer, &payee, &500, &symbol_short!("HASH1"), &1000);
 
         assert_eq!(token_client.balance(&contract_id), 500);
         assert_eq!(token_client.balance(&payer), 500);
 
         let state = client.escrow_state(&id);
         assert_eq!(state.status, EscrowStatus::Active);
+        assert_eq!(state.expiry, 1000);
 
         client.release_escrow(&payer, &id);
         assert_eq!(token_client.balance(&payee), 500);
@@ -265,7 +321,7 @@ mod test {
         let client = EscrowVaultClient::new(&env, &contract_id);
 
         client.init(&admin, &token_id);
-        let id = client.create_escrow(&payer, &payee, &300, &symbol_short!("HASH2"));
+        let id = client.create_escrow(&payer, &payee, &300, &symbol_short!("HASH2"), &1000);
 
         client.cancel_escrow(&id);
         assert_eq!(token_client.balance(&payer), 1000);
@@ -291,7 +347,7 @@ mod test {
         let client = EscrowVaultClient::new(&env, &contract_id);
 
         client.init(&admin, &token_id);
-        let id = client.create_escrow(&payer, &payee, &100, &symbol_short!("HASH3"));
+        let id = client.create_escrow(&payer, &payee, &100, &symbol_short!("HASH3"), &1000);
         client.release_escrow(&payer, &id);
         // Should panic
         client.release_escrow(&payer, &id);
@@ -308,5 +364,42 @@ mod test {
         let client = EscrowVaultClient::new(&env, &contract_id);
         client.init(&admin, &token);
         client.init(&admin, &token);
+    }
+
+    #[test]
+    fn test_recovery_logic() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let payee = Address::generate(&env);
+
+        let (token_id, sa_client, token_client) = create_token(&env, &admin);
+        sa_client.mint(&payer, &1000);
+
+        let contract_id = env.register_contract(None, EscrowVault);
+        let client = EscrowVaultClient::new(&env, &contract_id);
+
+        client.init(&admin, &token_id);
+        let expiry = 1000;
+        let id = client.create_escrow(&payer, &payee, &400, &symbol_short!("HASH4"), &expiry);
+
+        // Try recovery before expiry
+        env.ledger().with_mut(|li| li.timestamp = 500);
+        let res = client.try_recover_escrow(&id);
+        assert!(res.is_err());
+
+        // Recovery after expiry
+        env.ledger().with_mut(|li| li.timestamp = 1000);
+        client.recover_escrow(&id);
+
+        assert_eq!(token_client.balance(&payer), 1000);
+        let state = client.escrow_state(&id);
+        assert_eq!(state.status, EscrowStatus::Recovered);
+
+        // Try recovery again
+        let res = client.try_recover_escrow(&id);
+        assert!(res.is_err());
     }
 }

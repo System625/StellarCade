@@ -21,7 +21,7 @@ pub fn init(env: Env, admin: Address, token_address: Address)
 Create a new escrow. The payer locks `amount` tokens into the contract.
 
 ```rust
-pub fn create_escrow(env: Env, payer: Address, payee: Address, amount: i128, terms_hash: Symbol) -> u64
+pub fn create_escrow(env: Env, payer: Address, payee: Address, amount: i128, terms_hash: Symbol, expiry: u64) -> u64
 ```
 
 #### Parameters
@@ -33,6 +33,7 @@ pub fn create_escrow(env: Env, payer: Address, payee: Address, amount: i128, ter
 | `payee` | `Address` |
 | `amount` | `i128` |
 | `terms_hash` | `Symbol` |
+| `expiry` | `u64` |
 
 #### Return Type
 
@@ -58,6 +59,20 @@ Cancel an active escrow and return funds to the payer. Admin-only.
 
 ```rust
 pub fn cancel_escrow(env: Env, escrow_id: u64)
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `escrow_id` | `u64` |
+
+### `recover_escrow`
+Recover funds from an expired escrow. Admin-only.
+
+```rust
+pub fn recover_escrow(env: Env, escrow_id: u64)
 ```
 
 #### Parameters
