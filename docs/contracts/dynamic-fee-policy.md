@@ -113,3 +113,42 @@ pub fn fee_rule_state(env: Env, game_id: Symbol) -> Option<FeeRuleConfig>
 
 `Option<FeeRuleConfig>`
 
+### `preview_fee`
+Preview the fee that would be charged for `amount` under `game_id`'s rule without executing a transaction.
+
+Unlike `compute_fee`, this is a pure read — it emits no events and succeeds even when the rule is currently disabled.  Pass `None` for `context` to use a default 1× multiplier (10 000 bps).
+
+```rust
+pub fn preview_fee(env: Env, game_id: Symbol, amount: i128, context: Option<FeeContext>) -> Result<FeePreview, Error>
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `env` | `Env` | |
+| `game_id` | `Symbol` | Identifies the fee rule to preview |
+| `amount` | `i128` | The amount the fee would be computed against |
+| `context` | `Option<FeeContext>` | Optional multiplier context; omit for 1× default |
+
+#### Return Type
+
+`Result<FeePreview, Error>`
+
+#### `FeePreview` fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fee_amount` | `i128` | The computed fee for the given inputs |
+| `applied_bps` | `u32` | Effective basis-points rate after multiplier |
+| `base_fee_bps` | `u32` | Base rate from rule config (before tier/multiplier) |
+| `tier_applied` | `bool` | `true` if a tiered rate overrode the base rate |
+| `rule_enabled` | `bool` | Whether the rule is currently enabled |
+
+#### Errors
+
+| Error | Condition |
+|-------|-----------|
+| `RuleNotFound` | No rule has been configured for `game_id` |
+| `Overflow` | Arithmetic overflow in fee calculation |
+
