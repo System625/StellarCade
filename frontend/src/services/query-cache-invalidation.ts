@@ -532,12 +532,29 @@ export interface OptimisticMutationRecord<T = unknown> {
   appliedAt: number;
 }
 
+export type OptimisticRollbackReasonCode =
+  | "precondition_failed"
+  | "invalid_input"
+  | "submission_failed"
+  | "confirmation_failed"
+  | "timeout"
+  | "unknown";
+
+export interface OptimisticRollbackMetadata {
+  reason: OptimisticRollbackReasonCode;
+  message: string;
+  retryable: boolean;
+  correlationId?: string;
+  recordedAt: number;
+}
+
 /**
  * Coordinates optimistic cache updates for game actions with rollback and finalize.
  * Generic over cache value shape; safe to reuse for multiple mutation types.
  */
 export class OptimisticGameMutationHelper {
   private readonly snapshots = new Map<string, OptimisticMutationRecord<unknown>>();
+  private readonly rollbackMetadata = new Map<string, OptimisticRollbackMetadata>();
   private generation = 0;
 
   constructor(private readonly cache: QueryCache) {}
@@ -548,6 +565,7 @@ export class OptimisticGameMutationHelper {
    */
   apply<T>(key: QueryKey, optimisticData: T, policy?: QueryPolicy): number {
     const ks = keyToString(key);
+    this.rollbackMetadata.delete(ks);
     if (!this.snapshots.has(ks)) {
       const prev = this.cache.get<T>(key)?.data ?? null;
       this.snapshots.set(ks, {
@@ -564,7 +582,7 @@ export class OptimisticGameMutationHelper {
     return this.generation;
   }
 
-  revert(key: QueryKey): void {
+  revert(key: QueryKey, metadata?: OptimisticRollbackMetadata): void {
     const ks = keyToString(key);
     const snap = this.snapshots.get(ks);
     if (!snap) return;
@@ -573,16 +591,33 @@ export class OptimisticGameMutationHelper {
     } else {
       this.cache.set(key, snap.previous as never);
     }
+    if (metadata) {
+      this.rollbackMetadata.set(ks, metadata);
+    } else {
+      this.rollbackMetadata.delete(ks);
+    }
     this.snapshots.delete(ks);
   }
 
   /**
    * Revert only if this generation is still the active optimistic write (latest wins).
    */
-  revertIfLatest(key: QueryKey, generation: number): void {
+  revertIfLatest(
+    key: QueryKey,
+    generation: number,
+    metadata?: OptimisticRollbackMetadata,
+  ): void {
     const snap = this.snapshots.get(keyToString(key));
     if (!snap || snap.generation !== generation) return;
-    this.revert(key);
+    this.revert(key, metadata);
+  }
+
+  getRollbackMetadata(key: QueryKey): OptimisticRollbackMetadata | null {
+    return this.rollbackMetadata.get(keyToString(key)) ?? null;
+  }
+
+  clearRollbackMetadata(key: QueryKey): void {
+    this.rollbackMetadata.delete(keyToString(key));
   }
 
   /**
@@ -593,7 +628,9 @@ export class OptimisticGameMutationHelper {
     finalData?: T,
     fetcher?: Fetcher<T>,
   ): Promise<{ data: T } | { error: AppError }> {
-    this.snapshots.delete(keyToString(key));
+    const ks = keyToString(key);
+    this.snapshots.delete(ks);
+    this.rollbackMetadata.delete(ks);
     if (finalData !== undefined) {
       this.cache.set(key, finalData);
       return { data: finalData };
