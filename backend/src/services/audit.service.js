@@ -52,4 +52,13 @@ const log = async ({ actor, action, target, payload, outcome = 'success', metada
   }
 };
 
-module.exports = { log, hashPayload };
+const list = async ({ actor, action, limit = 50 } = {}) => {
+  try {
+    return await AuditLog.findAll({ actor, action, limit });
+  } catch (error) {
+    logger.error(`[AuditService] Failed to read audit log: ${error.message}`);
+    throw error;
+  }
+};
+
+module.exports = { log, list, hashPayload };

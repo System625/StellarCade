@@ -58,6 +58,32 @@ const AuditLog = {
       throw error;
     }
   },
+
+  /**
+   * Find audit log entries with optional actor/action filters.
+   * @param {Object} params
+   * @param {string} [params.actor]
+   * @param {string} [params.action]
+   * @param {number} [params.limit=50]
+   */
+  async findAll({ actor, action, limit = 50 } = {}) {
+    try {
+      const query = db('audit_logs').orderBy('created_at', 'desc').limit(limit);
+
+      if (actor) {
+        query.where({ actor });
+      }
+
+      if (action) {
+        query.where({ action });
+      }
+
+      return await query;
+    } catch (error) {
+      logger.error('Error in AuditLog.findAll:', error);
+      throw error;
+    }
+  },
 };
 
 module.exports = AuditLog;
