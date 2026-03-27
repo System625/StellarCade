@@ -1,5 +1,6 @@
 import type {
   CacheEntry,
+  CacheEntryState,
   CacheInvalidationEvent,
   QueryCacheSnapshot,
   QueryKey,
@@ -75,6 +76,30 @@ function hasPrefix(key: QueryKey, prefix: QueryKey): boolean {
   return true;
 }
 
+function resolveEntryState(entry: CacheEntry<unknown>, ts: number): CacheEntryState {
+  if (entry.meta.swr.isRefreshing) return "refreshing";
+  if (entry.meta.invalidatedAt !== undefined) return "invalid";
+  if (ts >= entry.meta.staleAt) return "stale";
+  return "fresh";
+}
+
+function withResolvedMeta<T>(entry: CacheEntry<T>, ts: number): CacheEntry<T> {
+  const state = resolveEntryState(entry as CacheEntry<unknown>, ts);
+  return {
+    ...entry,
+    meta: {
+      ...entry.meta,
+      swr: {
+        ...entry.meta.swr,
+        state,
+        isRefreshing: state === "refreshing",
+        isStale: state !== "fresh",
+        lastInvalidatedAt: entry.meta.invalidatedAt,
+      },
+    },
+  };
+}
+
 export interface QueryCacheOptions {
   /** Optional upper bound to prevent unbounded growth. */
   maxEntries?: number;
@@ -98,9 +123,10 @@ export class QueryCache {
   }
 
   private notify(key: QueryKey, entry: CacheEntry<unknown> | null) {
+    const normalized = entry ? withResolvedMeta(entry, now()) : null;
     for (const s of this.subscribers) {
       try {
-        s({ key, entry });
+        s({ key, entry: normalized });
       } catch {
         // swallow
       }
@@ -108,8 +134,19 @@ export class QueryCache {
   }
 
   snapshot(): QueryCacheSnapshot {
-    const keys = Array.from(this.entries.values()).map((e) => e.key);
-    return { keys, size: this.entries.size };
+    const entries = Array.from(this.entries.values()).map((entry) => {
+      const normalized = withResolvedMeta(entry, now());
+      return {
+        key: normalized.key,
+        state: normalized.meta.swr.state,
+        staleAt: normalized.meta.staleAt,
+        invalidatedAt: normalized.meta.invalidatedAt,
+        refreshStartedAt: normalized.meta.swr.refreshStartedAt,
+        refreshCompletedAt: normalized.meta.swr.refreshCompletedAt,
+      };
+    });
+    const keys = entries.map((entry) => entry.key);
+    return { keys, size: this.entries.size, entries };
   }
 
   registerFetcher<T>(key: QueryKey, fetcher: Fetcher<T>) {
@@ -122,7 +159,8 @@ export class QueryCache {
 
   get<T>(key: QueryKey): CacheEntry<T> | null {
     const e = this.entries.get(keyToString(key));
-    return (e as CacheEntry<T> | undefined) ?? null;
+    if (!e) return null;
+    return withResolvedMeta(e as CacheEntry<T>, now());
   }
 
   set<T>(key: QueryKey, data: T, policy?: QueryPolicy): CacheEntry<T> {
@@ -143,7 +181,15 @@ export class QueryCache {
         createdAt: existing?.meta.createdAt ?? ts,
         updatedAt: ts,
         staleAt: ts + effectivePolicy.staleTimeMs,
-        invalidatedAt: existing?.meta.invalidatedAt,
+        invalidatedAt: undefined,
+        swr: {
+          state: "fresh",
+          isStale: false,
+          isRefreshing: false,
+          lastInvalidatedAt: existing?.meta.swr.lastInvalidatedAt,
+          refreshStartedAt: existing?.meta.swr.refreshStartedAt,
+          refreshCompletedAt: ts,
+        },
       },
     };
 
@@ -171,9 +217,58 @@ export class QueryCache {
   isStale(key: QueryKey): boolean {
     const entry = this.get(key);
     if (!entry) return true;
-    const ts = now();
-    if (entry.meta.invalidatedAt !== undefined) return true;
-    return ts >= entry.meta.staleAt;
+    return entry.meta.swr.isStale;
+  }
+
+  private updateEntryState(
+    key: QueryKey,
+    updater: (entry: CacheEntry<unknown>) => CacheEntry<unknown>,
+  ): CacheEntry<unknown> | null {
+    const existing = this.entries.get(keyToString(key));
+    if (!existing) return null;
+    const updated = updater(existing);
+    this.entries.set(keyToString(key), updated);
+    this.notify(key, updated);
+    return updated;
+  }
+
+  private markRefreshing(key: QueryKey): void {
+    this.updateEntryState(key, (entry) => ({
+      ...entry,
+      meta: {
+        ...entry.meta,
+        swr: {
+          ...entry.meta.swr,
+          state: "refreshing",
+          isStale: true,
+          isRefreshing: true,
+          lastInvalidatedAt: entry.meta.invalidatedAt,
+          refreshStartedAt: now(),
+        },
+      },
+    }));
+  }
+
+  private markRefreshFailure(key: QueryKey): void {
+    this.updateEntryState(key, (entry) => {
+      const state: CacheEntryState =
+        entry.meta.invalidatedAt !== undefined ? "invalid" : "stale";
+
+      return {
+        ...entry,
+        meta: {
+          ...entry.meta,
+          swr: {
+            ...entry.meta.swr,
+            state,
+            isStale: true,
+            isRefreshing: false,
+            lastInvalidatedAt: entry.meta.invalidatedAt,
+            refreshCompletedAt: now(),
+          },
+        },
+      };
+    });
   }
 
   /**
@@ -200,6 +295,10 @@ export class QueryCache {
         };
       }
 
+      if (existing) {
+        this.markRefreshing(key);
+      }
+
       const data = await fetcher();
       this.set<T>(key, data);
       return { data };
@@ -209,21 +308,22 @@ export class QueryCache {
   }
 
   invalidate(key: QueryKey, _evt?: CacheInvalidationEvent) {
-    const e = this.entries.get(keyToString(key));
-    if (!e) return;
-
-    const updated: CacheEntry<unknown> = {
-      ...e,
+    const updated = this.updateEntryState(key, (entry) => ({
+      ...entry,
       meta: {
-        ...e.meta,
+        ...entry.meta,
         invalidatedAt: now(),
+        swr: {
+          ...entry.meta.swr,
+          state: "invalid",
+          isStale: true,
+          isRefreshing: false,
+          lastInvalidatedAt: now(),
+        },
       },
-    };
+    }));
 
-    this.entries.set(keyToString(key), updated);
-    this.notify(key, updated);
-
-    if (updated.policy.refetchOnInvalidate) {
+    if (updated?.policy.refetchOnInvalidate) {
       void this.refetch(key);
     }
   }
@@ -265,14 +365,12 @@ export class QueryCache {
     }
 
     try {
+      this.markRefreshing(key);
       const data = await fetcher();
       this.set<T>(key, data);
       return { data };
     } catch (e) {
-      this.invalidate(key, {
-        at: now(),
-        reason: "consistency_check",
-      });
+      this.markRefreshFailure(key);
       return { error: toAppError(e, undefined, { key }) };
     }
   }
