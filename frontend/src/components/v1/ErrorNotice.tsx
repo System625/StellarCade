@@ -285,19 +285,19 @@ export const ErrorNotice: React.FC<ErrorNoticeProps> = ({
       {/* Content */}
       <div className="error-notice__content">
         <div className="error-notice__message" role="alert">
-          {errorData.message}
+          {String(errorData.message)}
         </div>
         
-        {errorData.action && (
+        {errorData.action ? (
           <div className="error-notice__action">
-            {errorData.action}
+            {String(errorData.action)}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Actions */}
       <div className="error-notice__actions">
-        {showRetry && errorData.canRetry && onRetry && (
+        {showRetry && errorData.canRetry && onRetry ? (
           <button
             type="button"
             className="error-notice__retry-button"
@@ -308,9 +308,9 @@ export const ErrorNotice: React.FC<ErrorNoticeProps> = ({
           >
             {isRetrying ? 'Retrying...' : 'Retry'}
           </button>
-        )}
+        ) : null}
         
-        {showDismiss && onDismiss && (
+        {showDismiss && onDismiss ? (
           <button
             type="button"
             className="error-notice__dismiss-button"
@@ -320,18 +320,18 @@ export const ErrorNotice: React.FC<ErrorNoticeProps> = ({
           >
             ×
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Structured API Error Details */}
-      {error && typeof error === 'object' && 'apiDetails' in error && (error as AppError).apiDetails && (
+      {error && typeof error === 'object' && 'apiDetails' in error && (error as AppError).apiDetails ? (
         <ApiErrorDetailsSection details={(error as AppError).apiDetails!} testId={testId} />
-      )}
+      ) : null}
 
       {/* Debug Information */}
-      {errorData.debug && (
+      {errorData.debug ? (
         <DebugInfo debug={errorData.debug} testId={testId} />
-      )}
+      ) : null}
     </div>
   );
 };
