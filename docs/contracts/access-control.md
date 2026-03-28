@@ -82,6 +82,44 @@ pub fn get_admin(env: Env) -> Address
 
 `Address`
 
+### `role_member_count`
+Returns the number of accounts that currently hold the given role. Returns 0 for roles that have never been granted.
+
+```rust
+pub fn role_member_count(env: Env, role: Symbol) -> u32
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `role` | `Symbol` |
+
+#### Return Type
+
+`u32`
+
+### `list_role_members`
+Returns a bounded, deterministically-ordered slice of accounts that hold the given role.  Members are ordered by grant time (oldest first). Returns an empty vec for roles that have never been granted.
+
+```rust
+pub fn list_role_members(env: Env, role: Symbol, start: u32, limit: u32) -> Vec<Address>
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `role` | `Symbol` |
+| `start` | `u32` |
+| `limit` | `u32` |
+
+#### Return Type
+
+`Vec<Address>`
+
 ### `require_admin`
 ```rust
 pub fn require_admin(env: &Env)

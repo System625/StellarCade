@@ -1,5 +1,7 @@
 # epoch-scheduler
 
+Read-only timing snapshot returned by `epoch_snapshot`.  All ledger values are expressed in ledger-sequence units. Returns `None` from `epoch_snapshot` when the contract is not yet initialised.
+
 ## Public Methods
 
 ### `init`
@@ -93,4 +95,21 @@ pub fn task_state(env: Env, task_id: Symbol) -> Option<TaskData>
 #### Return Type
 
 `Option<TaskData>`
+
+### `epoch_snapshot`
+Returns a timing snapshot combining the current epoch, the next epoch boundary, and the ledger at which the current epoch began (last rollover).  Returns `None` when the contract has not yet been initialised or the epoch duration is zero, making the uninitialized state explicit.
+
+```rust
+pub fn epoch_snapshot(env: Env) -> Option<EpochSnapshot>
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+
+#### Return Type
+
+`Option<EpochSnapshot>`
 

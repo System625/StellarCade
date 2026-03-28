@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, Address, Env, Symbol,
+    contract, contractevent, contractimpl, contracttype, Address, Env, Symbol, Vec,
 };
 
 #[contracttype]
@@ -9,6 +9,7 @@ use soroban_sdk::{
 pub enum DataKey {
     Admin,
     Role(Symbol, Address),
+    RoleMembers(Symbol),
 }
 
 // Predefined roles as constants for reuse
@@ -69,6 +70,37 @@ impl AccessControl {
     pub fn get_admin(env: Env) -> Address {
         env.storage().instance().get(&DataKey::Admin).expect("Not initialized")
     }
+
+    /// Returns the number of accounts that currently hold the given role.
+    /// Returns 0 for roles that have never been granted.
+    pub fn role_member_count(env: Env, role: Symbol) -> u32 {
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::RoleMembers(role))
+            .unwrap_or_else(|| Vec::new(&env));
+        members.len()
+    }
+
+    /// Returns a bounded, deterministically-ordered slice of accounts that hold
+    /// the given role.  Members are ordered by grant time (oldest first).
+    /// Returns an empty vec for roles that have never been granted.
+    pub fn list_role_members(env: Env, role: Symbol, start: u32, limit: u32) -> Vec<Address> {
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::RoleMembers(role))
+            .unwrap_or_else(|| Vec::new(&env));
+        let total = members.len();
+        let mut result = Vec::new(&env);
+        let end = start.saturating_add(limit).min(total);
+        for i in start..end {
+            if let Some(addr) = members.get(i) {
+                result.push_back(addr);
+            }
+        }
+        result
+    }
 }
 
 // --- Library Functions / Guard Helpers ---
@@ -94,6 +126,16 @@ pub fn internal_grant_role(env: &Env, role: Symbol, account: Address) {
     if !env.storage().persistent().has(&key) {
         env.storage().persistent().set(&key, &());
 
+        // Maintain ordered member list
+        let members_key = DataKey::RoleMembers(role.clone());
+        let mut members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&members_key)
+            .unwrap_or_else(|| Vec::new(env));
+        members.push_back(account.clone());
+        env.storage().persistent().set(&members_key, &members);
+
         // Emit role change event
         RoleGranted { role, account }.publish(env);
     }
@@ -103,6 +145,21 @@ pub fn internal_revoke_role(env: &Env, role: Symbol, account: Address) {
     let key = DataKey::Role(role.clone(), account.clone());
     if env.storage().persistent().has(&key) {
         env.storage().persistent().remove(&key);
+
+        // Remove from member list
+        let members_key = DataKey::RoleMembers(role.clone());
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&members_key)
+            .unwrap_or_else(|| Vec::new(env));
+        let mut new_members = Vec::new(env);
+        for m in members.iter() {
+            if m != account {
+                new_members.push_back(m);
+            }
+        }
+        env.storage().persistent().set(&members_key, &new_members);
 
         // Emit role change event
         RoleRevoked { role, account }.publish(env);

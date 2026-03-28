@@ -51,6 +51,28 @@ pub enum DataKey {
 }
 
 // ---------------------------------------------------------------------------
+// Epoch snapshot
+// ---------------------------------------------------------------------------
+
+/// Read-only timing snapshot returned by `epoch_snapshot`.
+///
+/// All ledger values are expressed in ledger-sequence units.
+/// Returns `None` from `epoch_snapshot` when the contract is not yet
+/// initialised.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EpochSnapshot {
+    /// The epoch that is active at the current ledger sequence.
+    pub current_epoch: u64,
+    /// Number of ledgers per epoch as configured at init time.
+    pub epoch_duration: u32,
+    /// The ledger sequence at which the current epoch started (last rollover).
+    pub current_epoch_start_ledger: u64,
+    /// The ledger sequence at which the next epoch will begin.
+    pub next_epoch_start_ledger: u64,
+}
+
+// ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
 
@@ -185,6 +207,31 @@ impl EpochScheduler {
     /// Query the state of a task.
     pub fn task_state(env: Env, task_id: Symbol) -> Option<TaskData> {
         env.storage().persistent().get(&DataKey::Task(task_id))
+    }
+
+    /// Returns a timing snapshot combining the current epoch, the next epoch
+    /// boundary, and the ledger at which the current epoch began (last
+    /// rollover).
+    ///
+    /// Returns `None` when the contract has not yet been initialised or the
+    /// epoch duration is zero, making the uninitialized state explicit.
+    pub fn epoch_snapshot(env: Env) -> Option<EpochSnapshot> {
+        let duration: u32 = env.storage().instance().get(&DataKey::EpochDuration)?;
+        if duration == 0 {
+            return None;
+        }
+        let sequence = env.ledger().sequence() as u64;
+        let duration_u64 = duration as u64;
+        let current_epoch = sequence / duration_u64;
+        let current_epoch_start_ledger = current_epoch * duration_u64;
+        let next_epoch_start_ledger = current_epoch_start_ledger.saturating_add(duration_u64);
+
+        Some(EpochSnapshot {
+            current_epoch,
+            epoch_duration: duration,
+            current_epoch_start_ledger,
+            next_epoch_start_ledger,
+        })
     }
 
     // -----------------------------------------------------------------------
@@ -345,9 +392,80 @@ mod test {
             min_persistent_entry_ttl: 0,
             max_entry_ttl: 1000000,
         });
-        
+
         // Attempt to schedule for epoch 4 - should fail
         let result = s.client.try_schedule_task(&task_id, &4, &hash);
         assert_eq!(result, Err(Ok(Error::InvalidScheduleEpoch)));
+    }
+
+    // ── epoch_snapshot ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_epoch_snapshot_uninitialized() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register(EpochScheduler, ());
+        let client = EpochSchedulerClient::new(&env, &contract_id);
+        // Contract not yet initialised — snapshot must be None
+        assert!(client.epoch_snapshot().is_none());
+    }
+
+    #[test]
+    fn test_epoch_snapshot_active_state() {
+        let s = setup(); // epoch_duration = 100
+
+        s.env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            timestamp: 0,
+            protocol_version: 25,
+            sequence_number: 250, // Epoch 2 (250 / 100 = 2)
+            network_id: [0u8; 32],
+            base_reserve: 0,
+            min_temp_entry_ttl: 0,
+            min_persistent_entry_ttl: 0,
+            max_entry_ttl: 1000000,
+        });
+
+        let snap = s.client.epoch_snapshot().unwrap();
+        assert_eq!(snap.current_epoch, 2);
+        assert_eq!(snap.epoch_duration, 100);
+        assert_eq!(snap.current_epoch_start_ledger, 200); // 2 * 100
+        assert_eq!(snap.next_epoch_start_ledger, 300);    // 3 * 100
+    }
+
+    #[test]
+    fn test_epoch_snapshot_last_rollover_after_transition() {
+        let s = setup(); // epoch_duration = 100
+
+        // Before rollover: sequence 199 → epoch 1
+        s.env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            timestamp: 0,
+            protocol_version: 25,
+            sequence_number: 199,
+            network_id: [0u8; 32],
+            base_reserve: 0,
+            min_temp_entry_ttl: 0,
+            min_persistent_entry_ttl: 0,
+            max_entry_ttl: 1000000,
+        });
+        let snap_before = s.client.epoch_snapshot().unwrap();
+        assert_eq!(snap_before.current_epoch, 1);
+        assert_eq!(snap_before.current_epoch_start_ledger, 100);
+        assert_eq!(snap_before.next_epoch_start_ledger, 200);
+
+        // After rollover: sequence 200 → epoch 2
+        s.env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            timestamp: 0,
+            protocol_version: 25,
+            sequence_number: 200,
+            network_id: [0u8; 32],
+            base_reserve: 0,
+            min_temp_entry_ttl: 0,
+            min_persistent_entry_ttl: 0,
+            max_entry_ttl: 1000000,
+        });
+        let snap_after = s.client.epoch_snapshot().unwrap();
+        assert_eq!(snap_after.current_epoch, 2);
+        assert_eq!(snap_after.current_epoch_start_ledger, 200);
+        assert_eq!(snap_after.next_epoch_start_ledger, 300);
     }
 }

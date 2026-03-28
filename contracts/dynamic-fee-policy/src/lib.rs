@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, Address,
+    contract, contracterror, contractevent, contractimpl, contracttype, Address,
     Env, Symbol, Vec, Map,
 };
 
@@ -64,6 +64,26 @@ pub struct FeeContext {
 pub enum DataKey {
     Admin,
     FeeRule(Symbol), // Keyed by game_id
+}
+
+// ---------------------------------------------------------------------------
+// Fee preview
+// ---------------------------------------------------------------------------
+
+/// Read-only summary returned by `preview_fee`.  No event is emitted.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FeePreview {
+    /// The computed fee amount for the given inputs.
+    pub fee_amount: i128,
+    /// The effective basis-points rate that was applied (after multiplier).
+    pub applied_bps: u32,
+    /// The base fee rate from the rule config (before tier / multiplier).
+    pub base_fee_bps: u32,
+    /// `true` if a tiered rate was selected instead of the base rate.
+    pub tier_applied: bool,
+    /// Whether the fee rule is currently enabled.
+    pub rule_enabled: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +251,63 @@ impl DynamicFeePolicy {
         env.storage().persistent().get(&DataKey::FeeRule(game_id))
     }
 
+    /// Preview the fee that would be charged for `amount` under `game_id`'s rule.
+    ///
+    /// Unlike `compute_fee`, this is a pure read — it emits no events and does
+    /// not require the rule to be enabled.  Pass `None` for `context` to use a
+    /// 1× multiplier (10 000 bps).
+    ///
+    /// Returns `Error::RuleNotFound` when no rule has been configured for
+    /// `game_id`.
+    pub fn preview_fee(
+        env: Env,
+        game_id: Symbol,
+        amount: i128,
+        context: Option<FeeContext>,
+    ) -> Result<FeePreview, Error> {
+        let key = DataKey::FeeRule(game_id);
+        let rule: FeeRuleConfig = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(Error::RuleNotFound)?;
+
+        let base_fee_bps = rule.base_fee_bps;
+        let mut applied_bps = base_fee_bps;
+        let mut tier_applied = false;
+
+        if let Some(tiers) = rule.tiers {
+            let mut highest_threshold = -1i128;
+            for tier in tiers.iter() {
+                if amount >= tier.threshold && tier.threshold > highest_threshold {
+                    highest_threshold = tier.threshold;
+                    applied_bps = tier.fee_bps;
+                    tier_applied = true;
+                }
+            }
+        }
+
+        // Apply context multiplier; default to 1× (10 000 bps) when omitted.
+        let multiplier_bps = context.map(|c| c.multiplier_bps).unwrap_or(10_000);
+        let final_bps = applied_bps
+            .checked_mul(multiplier_bps)
+            .and_then(|v| v.checked_div(BASIS_POINTS_DIVISOR))
+            .ok_or(Error::Overflow)?;
+
+        let fee_amount = match calculate_fee(amount, final_bps) {
+            Ok(fee) => fee,
+            Err(_) => return Err(Error::Overflow),
+        };
+
+        Ok(FeePreview {
+            fee_amount,
+            applied_bps: final_bps,
+            base_fee_bps,
+            tier_applied,
+            rule_enabled: rule.enabled,
+        })
+    }
+
     // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
@@ -273,7 +350,7 @@ impl DynamicFeePolicy {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, vec, Map};
+    use soroban_sdk::{testutils::Address as _, symbol_short, Address, Env, vec, Map};
 
     struct Setup<'a> {
         _env: Env,
@@ -376,7 +453,7 @@ mod test {
     fn test_disabled_rule() {
         let s = setup();
         let game = symbol_short!("game1");
-        
+
         s.client.set_fee_rule(&game, &FeeRuleConfig {
             base_fee_bps: 500,
             tiers: None,
@@ -390,5 +467,100 @@ mod test {
 
         let result = s.client.try_compute_fee(&game, &1000, &context);
         assert_eq!(result, Err(Ok(Error::RuleDisabled)));
+    }
+
+    // ── preview_fee ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_preview_fee_base_no_context() {
+        let s = setup();
+        let game = symbol_short!("game1");
+
+        s.client.set_fee_rule(&game, &FeeRuleConfig {
+            base_fee_bps: 500, // 5%
+            tiers: None,
+            enabled: true,
+        });
+
+        // No context → default 1× multiplier
+        let preview = s.client.preview_fee(&game, &1000, &None);
+        assert_eq!(preview.fee_amount, 50);
+        assert_eq!(preview.applied_bps, 500);
+        assert_eq!(preview.base_fee_bps, 500);
+        assert!(!preview.tier_applied);
+        assert!(preview.rule_enabled);
+    }
+
+    #[test]
+    fn test_preview_fee_tiered() {
+        let s = setup();
+        let game = symbol_short!("game2");
+
+        let tiers = vec![&s._env,
+            FeeTier { threshold: 1000, fee_bps: 300 },
+            FeeTier { threshold: 5000, fee_bps: 100 },
+        ];
+        s.client.set_fee_rule(&game, &FeeRuleConfig {
+            base_fee_bps: 500,
+            tiers: Some(tiers),
+            enabled: true,
+        });
+
+        // Below threshold: base fee applies
+        let preview_low = s.client.preview_fee(&game, &500, &None);
+        assert_eq!(preview_low.fee_amount, 25); // 5% of 500
+        assert!(!preview_low.tier_applied);
+
+        // In second tier
+        let preview_high = s.client.preview_fee(&game, &10000, &None);
+        assert_eq!(preview_high.fee_amount, 100); // 1% of 10000
+        assert!(preview_high.tier_applied);
+        assert_eq!(preview_high.applied_bps, 100);
+    }
+
+    #[test]
+    fn test_preview_fee_with_context_multiplier() {
+        let s = setup();
+        let game = symbol_short!("game3");
+
+        s.client.set_fee_rule(&game, &FeeRuleConfig {
+            base_fee_bps: 1000, // 10%
+            tiers: None,
+            enabled: true,
+        });
+
+        let ctx = Some(FeeContext {
+            multiplier_bps: 5000, // 0.5×
+            additional_data: Map::new(&s._env),
+        });
+
+        let preview = s.client.preview_fee(&game, &1000, &ctx);
+        assert_eq!(preview.fee_amount, 50); // 10% × 0.5 = 5% of 1000
+        assert_eq!(preview.applied_bps, 500);
+    }
+
+    #[test]
+    fn test_preview_fee_disabled_rule_still_returns_preview() {
+        let s = setup();
+        let game = symbol_short!("game4");
+
+        s.client.set_fee_rule(&game, &FeeRuleConfig {
+            base_fee_bps: 500,
+            tiers: None,
+            enabled: false,
+        });
+
+        // preview_fee succeeds even when the rule is disabled
+        let preview = s.client.preview_fee(&game, &1000, &None);
+        assert_eq!(preview.fee_amount, 50);
+        assert!(!preview.rule_enabled);
+    }
+
+    #[test]
+    fn test_preview_fee_rule_not_found() {
+        let s = setup();
+        let unknown = symbol_short!("ghost");
+        let result = s.client.try_preview_fee(&unknown, &1000, &None);
+        assert_eq!(result, Err(Ok(Error::RuleNotFound)));
     }
 }

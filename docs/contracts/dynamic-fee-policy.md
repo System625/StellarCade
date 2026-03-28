@@ -1,5 +1,7 @@
 # dynamic-fee-policy
 
+Read-only summary returned by `preview_fee`.  No event is emitted.
+
 ## Public Methods
 
 ### `init`
@@ -112,4 +114,24 @@ pub fn fee_rule_state(env: Env, game_id: Symbol) -> Option<FeeRuleConfig>
 #### Return Type
 
 `Option<FeeRuleConfig>`
+
+### `preview_fee`
+Preview the fee that would be charged for `amount` under `game_id`'s rule.  Unlike `compute_fee`, this is a pure read — it emits no events and does not require the rule to be enabled.  Pass `None` for `context` to use a 1× multiplier (10 000 bps).  Returns `Error::RuleNotFound` when no rule has been configured for `game_id`.
+
+```rust
+pub fn preview_fee(env: Env, game_id: Symbol, amount: i128, context: Option<FeeContext>) -> Result<FeePreview, Error>
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `game_id` | `Symbol` |
+| `amount` | `i128` |
+| `context` | `Option<FeeContext>` |
+
+#### Return Type
+
+`Result<FeePreview, Error>`
 
