@@ -4,9 +4,12 @@ import { RouteErrorBoundary } from './components/v1/RouteErrorBoundary';
 import ProfileSettings from './pages/ProfileSettings';
 import { I18nProvider, useI18n } from './i18n/provider';
 import LocaleSwitcher from './components/LocaleSwitcher';
+import Breadcrumbs from './components/BreadCrumbs';
+
 import { ModalStackProvider } from './components/v1/modal-stack';
 import { FeatureFlagsProvider } from './services/feature-flags';
 import CommandPalette, { type Command } from './components/v1/CommandPalette';
+import { BrowserRouter } from 'react-router-dom';
 
 const DevContractCallSimulatorPanel = import.meta.env.DEV
   ? lazy(() =>
@@ -62,6 +65,7 @@ const AppContent: React.FC = () => {
         </nav>
         <LocaleSwitcher />
       </header>
+      <Breadcrumbs/>
       
       <main className="app-content" id="main-content">
         <RouteErrorBoundary>
@@ -90,6 +94,7 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
+    <BrowserRouter>
     <FeatureFlagsProvider>
       <I18nProvider>
         <ModalStackProvider>
@@ -97,6 +102,7 @@ const App: React.FC = () => {
         </ModalStackProvider>
       </I18nProvider>
     </FeatureFlagsProvider>
+    </BrowserRouter>
   );
 };
 

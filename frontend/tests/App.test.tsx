@@ -63,3 +63,43 @@ describe("App", () => {
     consoleErrorSpy.mockRestore();
   });
 });
+describe("Breadcrumb Navigation", () => {
+  it("renders the breadcrumb container with a link to home", async () => {
+    const { default: App } = await import("@/App");
+    render(<App />);
+
+    const nav = screen.getByRole("navigation", { name: /breadcrumb/i });
+    expect(nav).toBeInTheDocument();
+    expect(screen.getByTitle("Home")).toBeInTheDocument();
+  });
+
+  it("dynamically generates segments based on the URL path", async () => {
+    // Manually push a nested state to the history
+    window.history.pushState({}, "Test Page", "/games/stellarcade-classic");
+
+    const { default: App } = await import("@/App");
+    render(<App />);
+
+    // Check for intermediate segments
+    expect(screen.getByText("games")).toBeInTheDocument();
+    
+    // Check for the active leaf node
+    const currentPage = screen.getByText("stellarcade classic");
+    expect(currentPage).toBeInTheDocument();
+    expect(currentPage).toHaveAttribute("aria-current", "page");
+  });
+
+  it("omits breadcrumbs when on the root route", async () => {
+    window.history.pushState({}, "Home", "/");
+    
+    const { default: App } = await import("@/App");
+    render(<App />);
+
+    // Since 'pathnames' will be empty at '/', only the Home link remains.
+    // If your logic hides the whole nav when pathnames.length === 0, 
+    // you would test for queryByRole(...) to be null.
+    const breadcrumbLinks = screen.getAllByRole("listitem");
+    expect(breadcrumbLinks).toHaveLength(1); 
+    expect(screen.getByTitle("Home")).toBeInTheDocument();
+  });
+});
