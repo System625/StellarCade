@@ -136,3 +136,86 @@
   margin: 0.25rem 0 0;
   padding-left: 1rem;
 }
+
+.contract-call-simulator__log {
+  margin-top: 0.55rem;
+  border-top: 1px solid var(--cc-sim-border, #30363d);
+  padding-top: 0.45rem;
+}
+
+.contract-call-simulator__log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.contract-call-simulator__log-clear {
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--cc-sim-border, #30363d);
+  background: var(--cc-sim-btn, #21262d);
+  color: inherit;
+}
+
+.contract-call-simulator__log-clear:hover {
+  background: var(--cc-sim-btn-hover, #30363d);
+}
+
+.contract-call-simulator__log-empty {
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.contract-call-simulator__log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.contract-call-simulator__log-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+  font-size: 0.72rem;
+}
+
+.contract-call-simulator__log-time {
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.contract-call-simulator__log-method {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-call-simulator__log-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.contract-call-simulator__log-badge--success {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.contract-call-simulator__log-badge--failure {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}

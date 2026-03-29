@@ -19,6 +19,7 @@ type Subscriber = (
   meta?: WalletSessionMeta | null,
   error?: Error | null,
   refreshState?: WalletSessionRefreshState,
+  sessionDropped?: boolean,
 ) => void;
 
 const DEFAULT_KEY = "stc_wallet_session_v1";
@@ -60,6 +61,8 @@ export class WalletSessionService {
     maxAttempts: 1,
     terminal: false,
   };
+  /** True when a previously-established session was lost unexpectedly. */
+  private sessionDropped = false;
 
   constructor(opts?: WalletSessionOptions) {
     this.storageKey = opts?.storageKey ?? DEFAULT_KEY;
@@ -96,11 +99,16 @@ export class WalletSessionService {
     const refreshSnapshot = this.getRefreshState();
     for (const subscriber of this.subscribers) {
       try {
-        subscriber(this.state, this.meta, error, refreshSnapshot);
+        subscriber(this.state, this.meta, error, refreshSnapshot, this.sessionDropped);
       } catch (e) {
         console.error("Subscriber error", e);
       }
     }
+  }
+
+  /** Returns true when a previously-established session was lost unexpectedly. */
+  public getSessionDropped(): boolean {
+    return this.sessionDropped;
   }
 
   private persist(meta: WalletSessionMeta | null) {
@@ -182,6 +190,7 @@ export class WalletSessionService {
 
       this.meta = meta;
       this.state = WalletSessionState.CONNECTED;
+      this.sessionDropped = false;
       this.persist(meta);
       this.notify();
       return meta;
@@ -195,6 +204,8 @@ export class WalletSessionService {
 
   public async disconnect(): Promise<void> {
     this.state = WalletSessionState.DISCONNECTED;
+    // User-initiated disconnect — clear any dropped-session signal
+    this.sessionDropped = false;
     try {
       if (this.providerAdapter?.disconnect) {
         await this.providerAdapter.disconnect();
@@ -349,6 +360,7 @@ export class WalletSessionService {
         const meta = { ...stored, lastActiveAt: this.now() };
         this.meta = meta;
         this.state = WalletSessionState.CONNECTED;
+        this.sessionDropped = false;
         this.persist(meta);
         this.refreshState = this.createIdleRefreshState({
           trigger,
@@ -383,6 +395,7 @@ export class WalletSessionService {
         }
 
         this.state = WalletSessionState.DISCONNECTED;
+        this.sessionDropped = true;
         this.refreshState = {
           phase: WalletSessionRefreshPhase.FAILED,
           trigger,
@@ -403,6 +416,7 @@ export class WalletSessionService {
       "Wallet session refresh retries exhausted",
     );
     this.state = WalletSessionState.DISCONNECTED;
+    this.sessionDropped = true;
     this.refreshState = {
       phase: WalletSessionRefreshPhase.FAILED,
       trigger,

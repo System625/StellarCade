@@ -8,7 +8,7 @@ import {
     SkeletonPreset,
     LoadingState,
 } from '../../../src/components/v1/LoadingSkeletonSet';
-import { parseDimension, classNames } from '../../../src/utils/v1/skeletonUtils';
+import { parseDimension, classNames, prefersReducedMotion } from '../../../src/utils/v1/skeletonUtils';
 import {
     SKELETON_PRESETS,
     skHeightThumbnail,
@@ -313,5 +313,79 @@ describe('LoadingState preset prop', () => {
         );
         expect(screen.getByTestId('content')).toBeTruthy();
         expect(screen.queryByTestId('skeleton-preset-card')).toBeNull();
+    });
+});
+
+// ── Reduced-motion rendering tests ──────────────────────────────────
+
+describe('SkeletonBase reduced-motion behavior', () => {
+    const originalMatchMedia = window.matchMedia;
+
+    afterEach(() => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: originalMatchMedia,
+        });
+    });
+
+    function mockMatchMedia(matches: boolean) {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation((query: string) => ({
+                matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
+                media: query,
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+    }
+
+    it('renders SkeletonBase with no-motion class in reduced-motion environment', () => {
+        mockMatchMedia(true);
+        render(<SkeletonBase width="100px" height="20px" />);
+        const el = screen.getByTestId('skeleton-base');
+        expect(el.className).toContain('stellarcade-skeleton--no-motion');
+        expect(el).toHaveAttribute('data-reduced-motion', 'true');
+    });
+
+    it('renders SkeletonBase without no-motion class when reduced motion is not requested', () => {
+        mockMatchMedia(false);
+        render(<SkeletonBase width="100px" height="20px" />);
+        const el = screen.getByTestId('skeleton-base');
+        expect(el.className).not.toContain('stellarcade-skeleton--no-motion');
+        expect(el).not.toHaveAttribute('data-reduced-motion');
+    });
+
+    it('prefersReducedMotion() returns true when media query matches', () => {
+        mockMatchMedia(true);
+        expect(prefersReducedMotion()).toBe(true);
+    });
+
+    it('prefersReducedMotion() returns false when media query does not match', () => {
+        mockMatchMedia(false);
+        expect(prefersReducedMotion()).toBe(false);
+    });
+
+    it('SkeletonList items respect reduced-motion when reduced motion is active', () => {
+        mockMatchMedia(true);
+        render(<SkeletonList count={2} type="row" />);
+        const bases = screen.getAllByTestId('skeleton-base');
+        // All base skeletons should carry the no-motion class
+        for (const el of bases) {
+            expect(el.className).toContain('stellarcade-skeleton--no-motion');
+        }
+    });
+
+    it('default rendering is unchanged across breakpoints when reduced motion is not requested', () => {
+        mockMatchMedia(false);
+        render(<SkeletonPreset type="card" />);
+        const bases = screen.getAllByTestId('skeleton-base');
+        for (const el of bases) {
+            expect(el.className).not.toContain('stellarcade-skeleton--no-motion');
+            // Should still carry the base animation class
+            expect(el.className).toContain('stellarcade-skeleton');
+        }
     });
 });

@@ -52,6 +52,22 @@
   display: inline;
 }
 
+/* Pending-submit indicator */
+.form-error-summary__pending {
+  font-size: 0.8125rem;
+  color: var(--form-error-text);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+  opacity: 0.8;
+}
+
+/* Dimmed error list during pending submit */
+.form-error-summary__list--dimmed {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
 .field-hint {
   --field-hint-bg: var(--stc-error-bg, rgba(220, 53, 69, 0.08));
   --field-hint-border: var(--stc-error-border, #dc3545);

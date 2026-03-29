@@ -62,6 +62,12 @@ export interface NetworkGuardBannerProps {
   dismissalKey?: string;
   /** Versioned identity of the current banner message to prevent carryover. */
   dismissalIdentity?: string;
+  /**
+   * When true, the banner is suppressed because a dropped-session reconnect
+   * banner has higher priority. Keeps the two states visually distinct.
+   * @default false
+   */
+  isDroppedSession?: boolean;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -83,6 +89,7 @@ export const NetworkGuardBanner = React.memo(
     persistDismissal = false,
     dismissalKey = "network-guard-banner",
     dismissalIdentity,
+    isDroppedSession = false,
   }: NetworkGuardBannerProps) => {
     const [isDismissed, setIsDismissed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -111,8 +118,9 @@ export const NetworkGuardBanner = React.memo(
 
     // Determine if banner should be visible
     const shouldShow = useMemo(() => {
-      return show && !isSupported && !isDismissed;
-    }, [show, isSupported, isDismissed]);
+      // Suppress this banner when a dropped-session banner has higher priority
+      return show && !isSupported && !isDismissed && !isDroppedSession;
+    }, [show, isSupported, isDismissed, isDroppedSession]);
 
     // Validate that network data is available when unsupported
     const hasValidData = useMemo(() => {

@@ -499,7 +499,48 @@ describe('WalletStatusCard', () => {
     });
   });
 
-  // ── Snapshot ─────────────────────────────────────────────────────────────────
+  // ── Freshness timestamp & refresh state ──────────────────────────────────────
+  describe('Freshness timestamp and refresh state', () => {
+    it('renders last-updated timestamp when lastUpdatedAt is provided', () => {
+      const ts = Date.now() - 30_000; // 30 seconds ago
+      renderCard({ lastUpdatedAt: ts });
+      expect(screen.getByTestId('wallet-last-updated')).toBeInTheDocument();
+      expect(screen.getByTestId('wallet-last-updated')).toHaveTextContent(/Updated/i);
+    });
+
+    it('does not render freshness row when lastUpdatedAt is null and not refreshing', () => {
+      renderCard({ lastUpdatedAt: null, isRefreshing: false });
+      expect(screen.queryByTestId('wallet-freshness')).not.toBeInTheDocument();
+    });
+
+    it('renders refresh spinner when isRefreshing is true', () => {
+      renderCard({ isRefreshing: true });
+      expect(screen.getByTestId('wallet-refresh-spinner')).toBeInTheDocument();
+    });
+
+    it('hides last-updated text while refreshing', () => {
+      const ts = Date.now() - 60_000;
+      renderCard({ lastUpdatedAt: ts, isRefreshing: true });
+      expect(screen.queryByTestId('wallet-last-updated')).not.toBeInTheDocument();
+      expect(screen.getByTestId('wallet-refresh-spinner')).toBeInTheDocument();
+    });
+
+    it('shows last-updated text when not refreshing and timestamp is present', () => {
+      const ts = Date.now() - 60_000;
+      renderCard({ lastUpdatedAt: ts, isRefreshing: false });
+      expect(screen.getByTestId('wallet-last-updated')).toBeInTheDocument();
+      expect(screen.queryByTestId('wallet-refresh-spinner')).not.toBeInTheDocument();
+    });
+
+    it('refresh spinner has accessible role and label', () => {
+      renderCard({ isRefreshing: true });
+      const spinner = screen.getByTestId('wallet-refresh-spinner');
+      expect(spinner).toHaveAttribute('role', 'status');
+      expect(spinner).toHaveAttribute('aria-label', 'Refreshing balance');
+    });
+  });
+
+  // ── Snapshots ─────────────────────────────────────────────────────────────────
   describe('Snapshots', () => {
     it('matches snapshot for connected state', () => {
       const { container } = renderCard({

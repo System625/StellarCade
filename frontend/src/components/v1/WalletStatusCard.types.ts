@@ -84,6 +84,12 @@ export interface WalletStatusCardCallbacks {
    * Called when the user triggers network recovery from mismatch UI.
    */
   onRecoverNetwork?: () => void | Promise<void>;
+
+  /**
+   * Called when the user clicks the reconnect button in the dropped-session banner.
+   * Distinct from `onRetry`; intended for session-recovery flows.
+   */
+  onReconnect?: () => void | Promise<void>;
 }
 
 /**
@@ -181,4 +187,34 @@ export interface WalletStatusCardProps extends WalletStatusCardCallbacks {
    * Custom recovery label for mismatch CTA.
    */
   networkRecoveryLabel?: string;
+
+  /**
+   * When true the dropped-session reconnect banner is rendered.
+   * Driven from wallet session signals — do not set ad-hoc.
+   */
+  droppedSession?: boolean;
+
+  /**
+   * Disables the reconnect CTA while a reconnect is in progress.
+   */
+  reconnectPending?: boolean;
+
+  /**
+   * Custom label for the reconnect CTA.
+   * @default 'Reconnect'
+   */
+  reconnectLabel?: string;
+
+  /**
+   * Timestamp (ms since epoch) of the last successful balance/session refresh.
+   * When provided, a human-readable "Updated X ago" label is shown.
+   */
+  lastUpdatedAt?: number | null;
+
+  /**
+   * When true, renders a spinner to indicate a manual refresh is in progress.
+   * Kept distinct from the skeleton `isLoading` state.
+   * @default false
+   */
+  isRefreshing?: boolean;
 }

@@ -35,6 +35,13 @@ export interface PaginatedListControllerProps {
     errorMessage?: string | null;
     /** Optional retry callback when an error is shown */
     onRetry?: () => void;
+    /**
+     * When true, renders lightweight keyboard shortcut hints near the
+     * Previous / Next navigation buttons. Hints reflect real supported
+     * interactions (← / →) and are hidden on small screens via CSS.
+     * @default false
+     */
+    showKeyboardHints?: boolean;
 }
 
 /**
@@ -60,6 +67,7 @@ export const PaginatedListController: React.FC<PaginatedListControllerProps> = (
     testId = 'paginated-list-controller',
     errorMessage = null,
     onRetry,
+    showKeyboardHints = false,
 }) => {
     const isFirstPage = page <= 1;
     const isLastPage = page >= totalPages;
@@ -146,6 +154,9 @@ export const PaginatedListController: React.FC<PaginatedListControllerProps> = (
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
+                    {showKeyboardHints && (
+                        <span className="pagination-kbd-hint" aria-hidden="true">←</span>
+                    )}
                 </button>
 
                 <div className="pagination-pages">
@@ -176,6 +187,9 @@ export const PaginatedListController: React.FC<PaginatedListControllerProps> = (
                     aria-label="Go to next page"
                     type="button"
                 >
+                    {showKeyboardHints && (
+                        <span className="pagination-kbd-hint" aria-hidden="true">→</span>
+                    )}
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

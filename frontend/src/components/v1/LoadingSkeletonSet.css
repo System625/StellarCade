@@ -30,6 +30,24 @@
   animation: stellarcade-skeleton-pulse var(--sk-pulse-duration) var(--sk-pulse-easing) infinite;
 }
 
+/* ── Reduced-motion: disable pulse animation automatically ───────── */
+/* Applied via CSS media query so it is automatic at every call site. */
+@media (prefers-reduced-motion: reduce) {
+  .stellarcade-skeleton {
+    animation: none;
+    /* Use a subtle static opacity to keep the visual skeleton language
+       coherent without relying on motion. */
+    opacity: 0.7;
+  }
+}
+
+/* Class-level override for programmatic reduced-motion environments
+   (e.g. when the useReducedMotion hook sets data-reduced-motion="true"). */
+.stellarcade-skeleton--no-motion {
+  animation: none !important;
+  opacity: 0.7;
+}
+
 @media (prefers-color-scheme: dark) {
   .stellarcade-skeleton.dark-support {
     background-color: var(--sk-base-color-dark);

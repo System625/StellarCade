@@ -72,4 +72,37 @@ describe('TxStatusPanel', () => {
         );
         expect(screen.getByText(/Settled/)).toBeInTheDocument();
     });
+
+    it('renders retry count when retry metadata is present', () => {
+        render(
+            <TxStatusPanel
+                phase={TxPhase.SUBMITTED}
+                meta={{ ...mockMeta, retryCount: 3, lastAttemptAt: 1625097660000 }}
+            />
+        );
+        expect(screen.getByTestId('tx-status-panel-retry-count')).toHaveTextContent('3');
+        expect(screen.getByTestId('tx-status-panel-last-attempt')).toBeInTheDocument();
+    });
+
+    it('renders last attempt timestamp', () => {
+        render(
+            <TxStatusPanel
+                phase={TxPhase.PENDING}
+                meta={{ ...mockMeta, phase: TxPhase.PENDING, retryCount: 1, lastAttemptAt: 1625097660000 }}
+            />
+        );
+        expect(screen.getByTestId('tx-status-panel-last-attempt')).toBeInTheDocument();
+        expect(screen.getByText(/Last Attempt/)).toBeInTheDocument();
+    });
+
+    it('omits retry metadata when absent', () => {
+        render(
+            <TxStatusPanel
+                phase={TxPhase.SUBMITTED}
+                meta={mockMeta}
+            />
+        );
+        expect(screen.queryByTestId('tx-status-panel-retry-count')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('tx-status-panel-last-attempt')).not.toBeInTheDocument();
+    });
 });

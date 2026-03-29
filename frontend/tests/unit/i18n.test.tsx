@@ -35,10 +35,26 @@ const TestComponentInvalidLocale: React.FC = () => {
   return null;
 };
 
+const TestResetComponent: React.FC = () => {
+  const { locale, resetLocale } = useI18n();
+  return (
+    <div>
+      <span data-testid="current-locale">{locale}</span>
+      <button onClick={resetLocale}>Reset Locale</button>
+    </div>
+  );
+};
+
 describe('I18n Provider', () => {
   beforeEach(() => {
     // Clear console warnings
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Prevent real browser picking 'en' from masking defaultLocale
+    vi.stubGlobal('navigator', { languages: ['unsupported'] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('provides default locale context', () => {
@@ -134,6 +150,107 @@ describe('I18n Provider', () => {
     }).toThrow('useI18n must be used within an I18nProvider');
     
     consoleError.mockRestore();
+  });
+});
+
+describe('Locale Persistence & Fallback', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    const mockNavigator = { languages: ['fr-FR', 'fr'] };
+    vi.stubGlobal('navigator', mockNavigator);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('uses browser language on first load if supported', async () => {
+    const { resolveInitialLocale } = await import('../../src/i18n/provider');
+    expect(resolveInitialLocale('en')).toBe('fr');
+  });
+
+  it('returns default fallback if browser language not supported', async () => {
+    vi.stubGlobal('navigator', { languages: ['it-IT', 'it'] });
+    const { resolveInitialLocale } = await import('../../src/i18n/provider');
+    expect(resolveInitialLocale('en')).toBe('en');
+  });
+
+  it('restores locale from localStorage', async () => {
+    localStorage.setItem('stellarcade_locale', 'ja');
+    const { resolveInitialLocale } = await import('../../src/i18n/provider');
+    expect(resolveInitialLocale('en')).toBe('ja');
+  });
+
+  it('persists locale on change', async () => {
+    render(
+      <I18nProvider>
+        <TestComponent />
+      </I18nProvider>
+    );
+    
+    expect(localStorage.getItem('stellarcade_locale')).toBeNull();
+
+    const switchButton = screen.getByText('Switch to Spanish');
+    fireEvent.click(switchButton);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    expect(localStorage.getItem('stellarcade_locale')).toBe('es');
+  });
+
+  it('resets locale to browser default and clears storage', async () => {
+    vi.stubGlobal('navigator', { languages: ['de'] });
+    localStorage.setItem('stellarcade_locale', 'ja');
+
+    render(
+      <I18nProvider>
+        <TestResetComponent />
+      </I18nProvider>
+    );
+
+    expect(screen.getByTestId('current-locale')).toHaveTextContent('ja');
+
+    fireEvent.click(screen.getByText('Reset Locale'));
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(screen.getByTestId('current-locale')).toHaveTextContent('de');
+    expect(localStorage.getItem('stellarcade_locale')).toBeNull();
+  });
+});
+
+describe('Diagnostics & Fallbacks', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { languages: ['unsupported'] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('emits diagnostic for missing translations in DEV mode', async () => {
+    const onMissingTranslation = vi.fn();
+    render(
+      <I18nProvider onMissingTranslation={onMissingTranslation}>
+        <TestComponent />
+      </I18nProvider>
+    );
+
+    expect(onMissingTranslation).toHaveBeenCalledWith('non.existent.key', 'en');
+  });
+
+  it('emits diagnostic when falling back to default locale', async () => {
+    const onMissingTranslation = vi.fn();
+    render(
+      <I18nProvider defaultLocale="es" onMissingTranslation={onMissingTranslation}>
+        <TestComponent />
+      </I18nProvider>
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Spanish doesn't have app.title, so it falls back to English
+    expect(onMissingTranslation).toHaveBeenCalledWith('app.title', 'es');
   });
 });
 

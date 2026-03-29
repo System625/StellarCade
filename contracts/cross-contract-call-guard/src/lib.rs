@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address,
-    Env, Symbol,
+    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env, Symbol,
 };
 
 // ---------------------------------------------------------------------------
@@ -39,10 +38,21 @@ pub struct PolicyKey {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeniedCallAudit {
+    pub source: Address,
+    pub target: Address,
+    pub selector: Symbol,
+    pub denied_at: u64,
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     Admin,
     Policy(PolicyKey),
+    DeniedAudit(PolicyKey),
+    RuleCount(Address),
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +76,14 @@ pub struct CallDenied {
     pub source: Address,
     pub target: Address,
     pub selector: Symbol,
+}
+
+#[contractevent]
+pub struct DeniedCallAuditEvent {
+    pub source: Address,
+    pub target: Address,
+    pub selector: Symbol,
+    pub denied_at: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -101,11 +119,19 @@ impl CrossContractCallGuard {
         let admin = Self::require_admin(&env)?;
         admin.require_auth();
 
-        let key = DataKey::Policy(PolicyKey {
+        let policy_key = PolicyKey {
             source: source.clone(),
             target: target.clone(),
             selector: selector.clone(),
-        });
+        };
+        let key = DataKey::Policy(policy_key);
+
+        // Only increment rule count if the policy did not already exist
+        let already_exists = env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&key)
+            .unwrap_or(false);
 
         env.storage().persistent().set(&key, &true);
         env.storage().persistent().extend_ttl(
@@ -114,7 +140,24 @@ impl CrossContractCallGuard {
             PERSISTENT_BUMP_LEDGERS,
         );
 
-        CallAllowed { source, target, selector }.publish(&env);
+        if !already_exists {
+            let count_key = DataKey::RuleCount(source.clone());
+            let current: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+            let new_count = current.saturating_add(1);
+            env.storage().persistent().set(&count_key, &new_count);
+            env.storage().persistent().extend_ttl(
+                &count_key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_BUMP_LEDGERS,
+            );
+        }
+
+        CallAllowed {
+            source,
+            target,
+            selector,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -129,15 +172,64 @@ impl CrossContractCallGuard {
         let admin = Self::require_admin(&env)?;
         admin.require_auth();
 
-        let key = DataKey::Policy(PolicyKey {
+        let policy_key = PolicyKey {
             source: source.clone(),
             target: target.clone(),
             selector: selector.clone(),
-        });
+        };
+        let key = DataKey::Policy(policy_key.clone());
+
+        // Only decrement rule count if the policy existed
+        let existed = env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&key)
+            .unwrap_or(false);
 
         env.storage().persistent().remove(&key);
 
-        CallDenied { source, target, selector }.publish(&env);
+        if existed {
+            let count_key = DataKey::RuleCount(source.clone());
+            let current: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+            let new_count = current.saturating_sub(1);
+            env.storage().persistent().set(&count_key, &new_count);
+            env.storage().persistent().extend_ttl(
+                &count_key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_BUMP_LEDGERS,
+            );
+        }
+
+        // Store denied-call audit snapshot
+        let denied_at = env.ledger().timestamp();
+        let audit = DeniedCallAudit {
+            source: source.clone(),
+            target: target.clone(),
+            selector: selector.clone(),
+            denied_at,
+        };
+        let audit_key = DataKey::DeniedAudit(policy_key);
+        env.storage().persistent().set(&audit_key, &audit);
+        env.storage().persistent().extend_ttl(
+            &audit_key,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_BUMP_LEDGERS,
+        );
+
+        DeniedCallAuditEvent {
+            source: source.clone(),
+            target: target.clone(),
+            selector: selector.clone(),
+            denied_at,
+        }
+        .publish(&env);
+
+        CallDenied {
+            source,
+            target,
+            selector,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -155,7 +247,12 @@ impl CrossContractCallGuard {
             selector,
         });
 
-        if !env.storage().persistent().get::<_, bool>(&key).unwrap_or(false) {
+        if !env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&key)
+            .unwrap_or(false)
+        {
             return Err(Error::CallDenied);
         }
 
@@ -163,12 +260,7 @@ impl CrossContractCallGuard {
     }
 
     /// Check the state of a specific policy.
-    pub fn policy_state(
-        env: Env,
-        source: Address,
-        target: Address,
-        selector: Symbol,
-    ) -> bool {
+    pub fn policy_state(env: Env, source: Address, target: Address, selector: Symbol) -> bool {
         let key = DataKey::Policy(PolicyKey {
             source,
             target,
@@ -176,6 +268,28 @@ impl CrossContractCallGuard {
         });
 
         env.storage().persistent().get(&key).unwrap_or(false)
+    }
+
+    /// Read-only accessor: returns the audit snapshot for a denied call, or None.
+    pub fn denied_audit(
+        env: Env,
+        source: Address,
+        target: Address,
+        selector: Symbol,
+    ) -> Option<DeniedCallAudit> {
+        let key = DataKey::DeniedAudit(PolicyKey {
+            source,
+            target,
+            selector,
+        });
+
+        env.storage().persistent().get(&key)
+    }
+
+    /// Read-only accessor: returns the count of active (allowed) rules for a source.
+    pub fn rule_summary(env: Env, source: Address) -> u32 {
+        let key = DataKey::RuleCount(source);
+        env.storage().persistent().get(&key).unwrap_or(0)
     }
 
     // ---------------------------------------------------------------------------
@@ -197,7 +311,7 @@ impl CrossContractCallGuard {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, symbol_short};
+    use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 
     struct Setup<'a> {
         _env: Env,
@@ -217,7 +331,11 @@ mod test {
 
         let client: CrossContractCallGuardClient<'static> = unsafe { core::mem::transmute(client) };
 
-        Setup { _env: env, client, _admin: admin }
+        Setup {
+            _env: env,
+            client,
+            _admin: admin,
+        }
     }
 
     #[test]
@@ -257,9 +375,65 @@ mod test {
 
         // Allow
         s.client.allow_call(&source, &target, &selector);
-        
+
         // Assert should pass
         let result = s.client.try_assert_allowed(&source, &target, &selector);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_denied_call_audit() {
+        let s = setup();
+        let source = Address::generate(&s._env);
+        let target = Address::generate(&s._env);
+        let selector = symbol_short!("swap");
+
+        // No audit before any denial
+        let audit = s.client.denied_audit(&source, &target, &selector);
+        assert_eq!(audit, None);
+
+        // Allow then deny
+        s.client.allow_call(&source, &target, &selector);
+        s.client.deny_call(&source, &target, &selector);
+
+        // Audit should now exist
+        let audit = s.client.denied_audit(&source, &target, &selector);
+        assert!(audit.is_some());
+        let record = audit.unwrap();
+        assert_eq!(record.source, source);
+        assert_eq!(record.target, target);
+        assert_eq!(record.selector, selector);
+    }
+
+    #[test]
+    fn test_rule_summary() {
+        let s = setup();
+        let source = Address::generate(&s._env);
+        let target_a = Address::generate(&s._env);
+        let target_b = Address::generate(&s._env);
+        let sel_swap = symbol_short!("swap");
+        let sel_xfer = symbol_short!("transfer");
+
+        // Starts at zero
+        assert_eq!(s.client.rule_summary(&source), 0);
+
+        // Allow two rules for the same source
+        s.client.allow_call(&source, &target_a, &sel_swap);
+        assert_eq!(s.client.rule_summary(&source), 1);
+
+        s.client.allow_call(&source, &target_b, &sel_xfer);
+        assert_eq!(s.client.rule_summary(&source), 2);
+
+        // Re-allowing the same rule should NOT increment
+        s.client.allow_call(&source, &target_a, &sel_swap);
+        assert_eq!(s.client.rule_summary(&source), 2);
+
+        // Deny one rule
+        s.client.deny_call(&source, &target_a, &sel_swap);
+        assert_eq!(s.client.rule_summary(&source), 1);
+
+        // Denying a rule that no longer exists should NOT decrement
+        s.client.deny_call(&source, &target_a, &sel_swap);
+        assert_eq!(s.client.rule_summary(&source), 1);
     }
 }

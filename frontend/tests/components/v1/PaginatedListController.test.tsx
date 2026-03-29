@@ -173,4 +173,32 @@ describe('PaginatedListController', () => {
         fireEvent.click(screen.getByTestId('paginated-list-controller-retry'));
         expect(onRetry).toHaveBeenCalledTimes(1);
     });
+
+    describe('keyboard shortcut hints', () => {
+        it('renders shortcut hints when showKeyboardHints is true', () => {
+            render(<PaginatedListController {...defaultProps} showKeyboardHints={true} />);
+            const hints = document.querySelectorAll('.pagination-kbd-hint');
+            expect(hints.length).toBe(2);
+            expect(hints[0].textContent).toBe('←');
+            expect(hints[1].textContent).toBe('→');
+        });
+
+        it('does not render shortcut hints when showKeyboardHints is false', () => {
+            render(<PaginatedListController {...defaultProps} showKeyboardHints={false} />);
+            expect(document.querySelectorAll('.pagination-kbd-hint').length).toBe(0);
+        });
+
+        it('does not render shortcut hints when showKeyboardHints is omitted', () => {
+            render(<PaginatedListController {...defaultProps} />);
+            expect(document.querySelectorAll('.pagination-kbd-hint').length).toBe(0);
+        });
+
+        it('hints are aria-hidden so screen readers ignore them', () => {
+            render(<PaginatedListController {...defaultProps} showKeyboardHints={true} />);
+            const hints = document.querySelectorAll('.pagination-kbd-hint');
+            hints.forEach((hint) => {
+                expect(hint).toHaveAttribute('aria-hidden', 'true');
+            });
+        });
+    });
 });

@@ -10,6 +10,16 @@ import './ContractCallSimulatorPanel.css';
 
 const CONTRACT_ADDR_PLACEHOLDER = 'C…56 chars';
 
+interface SimulatorLogEntry {
+  id: number;
+  timestamp: string;
+  contractId: string;
+  method: string;
+  mode: 'success' | 'failure';
+  payload: string;
+  failureCode?: string;
+}
+
 interface ContractSimulatorPreset {
   id: string;
   label: string;
@@ -55,6 +65,7 @@ export const ContractCallSimulatorPanel: React.FC = () => {
   );
   const [status, setStatus] = useState<string | null>(null);
   const [presetId, setPresetId] = useState('');
+  const [logEntries, setLogEntries] = useState<SimulatorLogEntry[]>([]);
 
   const keys = useMemo(
     () => (open ? devListContractSimKeys() : []),
@@ -73,6 +84,18 @@ export const ContractCallSimulatorPanel: React.FC = () => {
       return;
     }
     devRegisterContractSimResult(contractId.trim(), method.trim(), result);
+    setLogEntries((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        contractId: contractId.trim(),
+        method: method.trim(),
+        mode,
+        payload,
+        failureCode: mode === 'failure' ? failureCode : undefined,
+      },
+    ]);
     setStatus(`Registered mock for ${method.trim()}.`);
   };
 
@@ -251,6 +274,51 @@ export const ContractCallSimulatorPanel: React.FC = () => {
               </ul>
             </div>
           )}
+
+          {/* Request-response log pane */}
+          <div className="contract-call-simulator__log" data-testid="contract-call-simulator-log">
+            <div className="contract-call-simulator__log-header">
+              <strong>Request Log ({logEntries.length})</strong>
+              {logEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setLogEntries([])}
+                  className="contract-call-simulator__log-clear"
+                  data-testid="contract-call-simulator-log-clear"
+                >
+                  Clear log
+                </button>
+              )}
+            </div>
+            {logEntries.length === 0 ? (
+              <p
+                className="contract-call-simulator__log-empty"
+                data-testid="contract-call-simulator-log-empty"
+              >
+                No requests logged yet. Register a mock to see entries here.
+              </p>
+            ) : (
+              <ul className="contract-call-simulator__log-list">
+                {logEntries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className={`contract-call-simulator__log-entry contract-call-simulator__log-entry--${entry.mode}`}
+                    data-testid="contract-call-simulator-log-entry"
+                  >
+                    <span className="contract-call-simulator__log-time">
+                      {entry.timestamp.slice(11, 19)}
+                    </span>
+                    <span className="contract-call-simulator__log-method">
+                      {entry.method}
+                    </span>
+                    <span className={`contract-call-simulator__log-badge contract-call-simulator__log-badge--${entry.mode}`}>
+                      {entry.mode}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
     </aside>

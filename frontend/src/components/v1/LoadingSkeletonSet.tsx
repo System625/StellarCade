@@ -1,6 +1,6 @@
 import React from 'react';
 import './LoadingSkeletonSet.css';
-import { classNames, parseDimension } from '../../utils/v1/skeletonUtils';
+import { classNames, parseDimension, useReducedMotion } from '../../utils/v1/skeletonUtils';
 import {
     SKELETON_PRESETS,
     skRadiusSm,
@@ -34,10 +34,17 @@ function radiusTokenClass(radius?: string | number): string | undefined {
 export function SkeletonBase({ width, height, borderRadius, className, circle, style, ...rest }: SkeletonBaseProps) {
     const resolvedRadius = circle ? '50%' : borderRadius;
     const tokenCls = radiusTokenClass(circle ? '50%' : (typeof resolvedRadius === 'string' ? resolvedRadius : undefined));
+    const reducedMotion = useReducedMotion();
 
     return (
         <div
-            className={classNames('stellarcade-skeleton', 'stellarcade-skeleton-base', tokenCls, className)}
+            className={classNames(
+                'stellarcade-skeleton',
+                'stellarcade-skeleton-base',
+                tokenCls,
+                reducedMotion ? 'stellarcade-skeleton--no-motion' : undefined,
+                className,
+            )}
             style={{
                 width: parseDimension(width),
                 height: parseDimension(height) || '1rem',
@@ -45,6 +52,7 @@ export function SkeletonBase({ width, height, borderRadius, className, circle, s
                 ...style,
             }}
             data-testid="skeleton-base"
+            data-reduced-motion={reducedMotion ? 'true' : undefined}
             {...rest}
         />
     );

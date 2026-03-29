@@ -31,6 +31,7 @@ export function createInitialState<T, E = Error>(): AsyncActionResult<T, E> {
         isSuccess: false,
         isError: false,
         isIdle: true,
+        isPendingSubmit: false,
     };
 }
 
@@ -47,14 +48,16 @@ export function transitionState<T, E = Error>(
     data: T | null = null,
     error: E | null = null
 ): AsyncActionResult<T, E> {
+    const isLoading = status === "loading";
     return {
         status,
         data,
         error,
-        isLoading: status === "loading",
+        isLoading,
         isSuccess: status === "success",
         isError: status === "error",
         isIdle: status === "idle",
+        isPendingSubmit: isLoading,
     };
 }
 

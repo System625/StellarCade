@@ -158,6 +158,14 @@ pub struct PaidOut {
     pub amount: i128,
 }
 
+#[contractevent]
+pub struct Reconciled {
+    #[topic]
+    pub admin: Address,
+    pub amount: i128,
+    pub new_available: i128,
+}
+
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -424,6 +432,53 @@ impl PrizePool {
         PaidOut { to, game_id, amount }.publish(&env);
 
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // sync
+    // -----------------------------------------------------------------------
+
+    /// Reconcile the contract's accounting with its actual token balance.
+    ///
+    /// If tokens were sent directly to the contract address (bypassing `fund`),
+    /// this method allows an admin to sync the `available` balance upward
+    /// to restore the invariant: `available + total_reserved == balance`.
+    ///
+    /// This method only moves accounting UPWARD. It will not reduce `available`
+    /// or touch `total_reserved` or any active reservations.
+    pub fn sync(env: Env, admin: Address) -> Result<i128, Error> {
+        require_initialized(&env)?;
+        require_admin(&env, &admin)?;
+
+        let token = get_token(&env);
+        let actual_balance = TokenClient::new(&env, &token).balance(&env.current_contract_address());
+
+        let available = get_available(&env);
+        let reserved = get_total_reserved(&env);
+
+        // Invariant: available + reserved == actual_balance
+        // Delta = actual_balance - (available + reserved)
+        let tracked_total = available.checked_add(reserved).ok_or(Error::Overflow)?;
+        
+        if actual_balance > tracked_total {
+            let delta = actual_balance.checked_sub(tracked_total).ok_or(Error::Overflow)?;
+            let new_available = available.checked_add(delta).ok_or(Error::Overflow)?;
+
+            set_persistent_i128(&env, DataKey::Available, new_available);
+            update_markers(&env);
+
+            Reconciled {
+                admin: admin.clone(),
+                amount: delta,
+                new_available,
+            }.publish(&env);
+
+            Ok(delta)
+        } else {
+            // No-op if balance is already in sync or somehow lower (which shouldn't happen 
+            // unless tokens were burned/slashed externally, which we don't handle here).
+            Ok(0)
+        }
     }
 
     // -----------------------------------------------------------------------

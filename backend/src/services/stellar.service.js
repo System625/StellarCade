@@ -82,8 +82,13 @@
  */
 const StellarSdk = require('@stellar/stellar-sdk');
 const logger = require('../utils/logger');
-const { server, passphrase } = require('../config/stellar');
+const { server, passphrase, maxRetries, retryInterval } = require('../config/stellar');
 const Outbox = require('../models/Outbox.model');
+
+/**
+ * Utility to wait for a specified duration.
+ */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class NetworkMismatchError extends Error {
   constructor({ expectedNetwork, receivedNetwork }) {
@@ -208,46 +213,74 @@ const submitTransaction = async (transactionXDR) => {
     };
   }
 
-  // --- 2. Submit to Horizon ---
-  logger.info('Submitting transaction to Stellar network...');
-  try {
-    const response = await server.submitTransaction(transaction);
+  // --- 2. Submit to Horizon with Retry Policy ---
+  let attempt = 0;
+  let lastError = null;
 
-    logger.info(
-      `Transaction submitted successfully. hash=${response.hash} ledger=${response.ledger}`
-    );
+  while (attempt <= maxRetries) {
+    if (attempt > 0) {
+      logger.info(`Retrying transaction submission (attempt ${attempt}/${maxRetries})...`);
+      await sleep(retryInterval);
+    } else {
+      logger.info('Submitting transaction to Stellar network...');
+    }
 
-    return {
-      status: 'success',
-      hash: response.hash,
-      ledger: response.ledger,
-      successful: response.successful,
-      envelopeXDR: response.envelope_xdr,
-      resultXDR: response.result_xdr,
-      errorCode: null,
-      errorMessage: null,
-      resultCodes: null,
-    };
-  } catch (err) {
-    const parsed = parseHorizonError(err);
+    try {
+      const response = await server.submitTransaction(transaction);
 
-    logger.error(
-      `Transaction submission failed. code=${parsed.code} httpStatus=${parsed.httpStatus} message=${parsed.message}`,
-      { resultCodes: parsed.resultCodes }
-    );
+      logger.info(
+        `Transaction submitted successfully. hash=${response.hash} ledger=${response.ledger}`
+      );
 
-    return {
-      status: 'error',
-      hash: null,
-      ledger: null,
-      successful: false,
-      envelopeXDR: null,
-      resultXDR: null,
-      errorCode: parsed.code,
-      errorMessage: parsed.message,
-      resultCodes: parsed.resultCodes,
-    };
+      return {
+        status: 'success',
+        hash: response.hash,
+        ledger: response.ledger,
+        successful: response.successful,
+        envelopeXDR: response.envelope_xdr,
+        resultXDR: response.result_xdr,
+        errorCode: null,
+        errorMessage: null,
+        resultCodes: null,
+      };
+    } catch (err) {
+      const parsed = parseHorizonError(err);
+      lastError = parsed;
+
+      // Only retry for certain errors
+      const retriable = [
+        STELLAR_ERRORS.TIMEOUT,
+        STELLAR_ERRORS.SERVER_ERROR,
+        STELLAR_ERRORS.RATE_LIMITED,
+        STELLAR_ERRORS.NETWORK_ERROR,
+      ].includes(parsed.code);
+
+      if (!retriable || attempt >= maxRetries) {
+        logger.error(
+          `Transaction submission failed. code=${parsed.code} httpStatus=${parsed.httpStatus} message=${parsed.message} attempts=${attempt + 1}`,
+          { resultCodes: parsed.resultCodes }
+        );
+        break;
+      }
+
+      logger.warn(
+        `Transient error during submission. code=${parsed.code} httpStatus=${parsed.httpStatus} message=${parsed.message}. Will retry.`
+      );
+      attempt++;
+    }
   }
+
+  return {
+    status: 'error',
+    hash: null,
+    ledger: null,
+    successful: false,
+    envelopeXDR: null,
+    resultXDR: null,
+    errorCode: lastError.code,
+    errorMessage: lastError.message,
+    resultCodes: lastError.resultCodes,
+  };
 };
 
 /**

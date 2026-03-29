@@ -51,63 +51,73 @@ export const GameLobby: React.FC = () => {
     await retryNetworkCheck();
   }, [retryNetworkCheck]);
 
-  if (loading) return <div className="lobby-loading">Loading elite games...</div>;
-  if (error) return <div className="lobby-error">Failed to load games: {error}</div>;
+  if (loading) return <div className="lobby-loading" role="status" aria-live="polite">Loading elite games...</div>;
+  if (error) return <div className="lobby-error" role="status" aria-live="polite">Failed to load games: {error}</div>;
 
   return (
     <div className="game-lobby">
-      <NetworkGuardBanner
-        network={wallet.network}
-        normalizedNetwork={networkSupport.normalizedActual}
-        supportedNetworks={networkSupport.supportedNetworks}
-        isSupported={!networkMismatch}
-        onSwitchNetwork={recoverNetwork}
-        onRetryNetworkCheck={retryNetworkCheck}
-        actionLabel="Recover Network"
-        retryLabel="Retry Check"
-        dismissible={false}
-        show={networkMismatch}
-      />
+      <section aria-label="Wallet and network status" className="lobby-dashboard">
+        <div className="lobby-dashboard__col">
+          <NetworkGuardBanner
+            network={wallet.network}
+            normalizedNetwork={networkSupport.normalizedActual}
+            supportedNetworks={networkSupport.supportedNetworks}
+            isSupported={!networkMismatch}
+            onSwitchNetwork={recoverNetwork}
+            onRetryNetworkCheck={retryNetworkCheck}
+            actionLabel="Recover Network"
+            retryLabel="Retry Check"
+            dismissible={false}
+            show={networkMismatch}
+          />
 
-      <WalletStatusCard
-        status={wallet.status}
-        address={wallet.address}
-        network={wallet.network}
-        provider={wallet.provider}
-        capabilities={wallet.capabilities}
-        error={wallet.error}
-        onConnect={() => wallet.connect()}
-        onDisconnect={wallet.disconnect}
-        onRetry={wallet.refresh}
-        networkMismatch={networkMismatch}
-        networkRecoveryPending={networkCheckPending}
-        onRecoverNetwork={recoverNetwork}
-        networkRecoveryLabel="Recover Network"
-      />
+          <WalletStatusCard
+            status={wallet.status}
+            address={wallet.address}
+            network={wallet.network}
+            provider={wallet.provider}
+            capabilities={wallet.capabilities}
+            error={wallet.error}
+            onConnect={() => wallet.connect()}
+            onDisconnect={wallet.disconnect}
+            onRetry={wallet.refresh}
+            networkMismatch={networkMismatch}
+            networkRecoveryPending={networkCheckPending}
+            onRecoverNetwork={recoverNetwork}
+            networkRecoveryLabel="Recover Network"
+            lastUpdatedAt={wallet.lastUpdatedAt}
+            isRefreshing={wallet.isRefreshing}
+          />
+        </div>
 
-      <div className="lobby-header">
-        <h2>Live Arena</h2>
-        <p>Real-time game status across the Stellar ecosystem.</p>
-      </div>
-      
-      {games.length === 0 ? (
-        <div className="lobby-empty">
-          <div className="empty-icon">📭</div>
-          <p>No games active at the moment. Check back later!</p>
+        <div className="lobby-dashboard__col">
+          <div className="lobby-header">
+            <h2 id="games-heading">Live Arena</h2>
+            <p>Real-time game status across the Stellar ecosystem.</p>
+          </div>
         </div>
-      ) : (
-        <div className="games-grid">
-          {games.map((game) => (
-            <StatusCard 
-              key={game.id}
-              id={game.id}
-              name={game.name}
-              status={game.status}
-              wager={game.wager as number | undefined}
-            />
-          ))}
-        </div>
-      )}
+      </section>
+
+      <section aria-labelledby="games-heading" className="games-section">
+        {games.length === 0 ? (
+          <div className="lobby-empty" role="status" aria-live="polite">
+            <div className="empty-icon">📭</div>
+            <p>No games active at the moment. Check back later!</p>
+          </div>
+        ) : (
+          <div className="games-grid" role="region" aria-label="Active games">
+            {games.map((game) => (
+              <StatusCard
+                key={game.id}
+                id={game.id}
+                name={game.name}
+                status={game.status}
+                wager={game.wager as number | undefined}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

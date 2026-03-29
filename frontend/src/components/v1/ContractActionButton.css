@@ -2,3 +2,10 @@
   outline: 2px solid var(--v1-primary-main, #3b82f6);
   outline-offset: 2px;
 }
+
+.contract-action-button__disabled-reason {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--v1-text-secondary, #9ca3af);
+  line-height: 1.4;
+}

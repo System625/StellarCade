@@ -122,6 +122,24 @@ pub fn payout(env: Env, admin: Address, to: Address, game_id: u64, amount: i128)
 
 `Result<(), Error>`
 
+### `sync`
+Reconcile the contract's accounting with its actual token balance.  If tokens were sent directly to the contract address (bypassing `fund`), this method allows an admin to sync the `available` balance upward to restore the invariant: `available + total_reserved == balance`.  This method only moves accounting UPWARD. It will not reduce `available` or touch `total_reserved` or any active reservations.
+
+```rust
+pub fn sync(env: Env, admin: Address) -> Result<i128, Error>
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `admin` | `Address` |
+
+#### Return Type
+
+`Result<i128, Error>`
+
 ### `get_pool_state`
 Returns a point-in-time snapshot of the pool's accounting state.
 

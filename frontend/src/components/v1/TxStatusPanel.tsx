@@ -166,6 +166,20 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
         </div>
       )}
 
+      {meta.retryCount != null && meta.retryCount > 0 && (
+        <div className="tx-status-panel__meta-row" data-testid={`${testId}-retry-count`}>
+          <span className="tx-status-panel__meta-label">Retries</span>
+          <span>{meta.retryCount}</span>
+        </div>
+      )}
+
+      {meta.lastAttemptAt != null && (
+        <div className="tx-status-panel__meta-row" data-testid={`${testId}-last-attempt`}>
+          <span className="tx-status-panel__meta-label">Last Attempt</span>
+          <span>{formatDate(meta.lastAttemptAt, { timeStyle: 'short' })}</span>
+        </div>
+      )}
+
       {(onExplorerLink || explorerUrl) && (
         <button
           type="button"

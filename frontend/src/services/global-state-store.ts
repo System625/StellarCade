@@ -17,6 +17,7 @@ type Subscriber = (state: GlobalState) => void;
 const DEFAULT_KEY = "stc_global_state_v1";
 const BANNER_DISMISSALS_KEY = "stc_banner_dismissals_v1";
 const NOTIFICATION_PREFERENCES_KEY = "stc_notification_preferences_v1";
+const EVENT_FEED_FILTER_KEY_PREFIX = "stc_feed_filter_v1";
 
 export interface BannerDismissalEntry {
   identity: string;
@@ -293,6 +294,55 @@ export function resetNotificationPreferences(): NotificationPreferences {
   const defaults = { ...DEFAULT_NOTIFICATION_PREFERENCES };
   persistNotificationPreferences(defaults);
   return defaults;
+}
+
+// ── Event feed filter persistence (session-scoped) ─────────────────────────────
+
+function eventFeedFilterStorageKey(scope: string): string {
+  return `${EVENT_FEED_FILTER_KEY_PREFIX}_${scope}`;
+}
+
+/**
+ * Returns the persisted active filter values for a given feed scope.
+ * Uses sessionStorage so the state is cleared on tab close (session-scoped).
+ * Returns null when no persisted state exists (first visit / new scope).
+ */
+export function getPersistedEventFeedFilter(scope: string): string[] | null {
+  if (!isStorageAvailable() || !scope) return null;
+  try {
+    const raw = sessionStorage.getItem(eventFeedFilterStorageKey(scope));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persists the active filter values for a given feed scope.
+ * Pass an empty array to persist an explicit "no active filters" state.
+ */
+export function persistEventFeedFilter(scope: string, values: string[]): void {
+  if (!isStorageAvailable() || !scope) return;
+  try {
+    sessionStorage.setItem(eventFeedFilterStorageKey(scope), JSON.stringify(values));
+  } catch {
+    // no-op — storage quota exceeded or unavailable
+  }
+}
+
+/**
+ * Removes the persisted filter state for a given feed scope.
+ * Subsequent reads will return null (default filter behavior).
+ */
+export function clearEventFeedFilter(scope: string): void {
+  if (!isStorageAvailable() || !scope) return;
+  try {
+    sessionStorage.removeItem(eventFeedFilterStorageKey(scope));
+  } catch {
+    // no-op
+  }
 }
 
 export default GlobalStateStore;

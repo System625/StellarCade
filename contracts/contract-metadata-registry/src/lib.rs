@@ -198,24 +198,76 @@ impl ContractMetadataRegistry {
         env.storage().persistent().get(&DataKey::Metadata(contract_id))
     }
 
+    /// Return the latest published metadata for a contract key.
+    ///
+    /// This is a direct lookup that avoids scanning version lists.
+    /// Returns `None` for unknown contract keys.
+    pub fn latest_published(env: Env, contract_id: Address) -> Option<MetadataRecord> {
+        env.storage().persistent().get(&DataKey::Metadata(contract_id))
+    }
+
     /// Query the complete history of metadata for a contract.
+    ///
+    /// Records are returned in ascending version order (oldest first).
     pub fn history(env: Env, contract_id: Address) -> Vec<MetadataRecord> {
         let mut history_vec = Vec::new(&env);
         let current_opt: Option<MetadataRecord> = env.storage().persistent().get(&DataKey::Metadata(contract_id.clone()));
-        
+
         if let Some(current) = current_opt {
-            // Iterate from 1 to current.version to reconstruct history
-            // Note: This assumes versions are sequential or at least we can find them.
-            // If they are not sequential, we might need a different storage pattern.
-            // For now, looking up each version.
             for v in 1..=current.version {
                 if let Some(record) = env.storage().persistent().get::<_, MetadataRecord>(&DataKey::History(contract_id.clone(), v)) {
                     history_vec.push_back(record);
                 }
             }
         }
-        
+
         history_vec
+    }
+
+    /// Query a bounded window of version history for a contract.
+    ///
+    /// Returns at most `limit` records in ascending version order,
+    /// starting from the most recent version and working backwards.
+    /// If `limit` is 0 or the contract key is unknown, returns an empty vec.
+    pub fn history_bounded(env: Env, contract_id: Address, limit: u32) -> Vec<MetadataRecord> {
+        let mut results = Vec::new(&env);
+        if limit == 0 {
+            return results;
+        }
+        let current_opt: Option<MetadataRecord> =
+            env.storage().persistent().get(&DataKey::Metadata(contract_id.clone()));
+        let current = match current_opt {
+            Some(c) => c,
+            None => return results,
+        };
+
+        // Collect up to `limit` entries from the most recent version backwards
+        let mut collected: u32 = 0;
+        let mut v = current.version;
+        // Temporary reverse buffer: we collect newest-first, then reverse
+        let mut buf = Vec::new(&env);
+        while v >= 1 && collected < limit {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, MetadataRecord>(&DataKey::History(contract_id.clone(), v))
+            {
+                buf.push_back(record);
+                collected += 1;
+            }
+            if v == 0 {
+                break;
+            }
+            v -= 1;
+        }
+
+        // Reverse to ascending order
+        let len = buf.len();
+        for i in (0..len).rev() {
+            results.push_back(buf.get(i).unwrap());
+        }
+
+        results
     }
 
     // ---------------------------------------------------------------------------
@@ -323,8 +375,75 @@ mod test {
         let _hash = BytesN::from_array(&s._env, &[1u8; 32]);
         let _uri = String::from_str(&s._env, "ipfs://v1");
 
-        // We can't actually test auth failure easily with mock_all_auths() 
+        // We can't actually test auth failure easily with mock_all_auths()
         // unless we switch it off or use different patterns.
         // Assuming Admin check is verified by common patterns.
+    }
+
+    #[test]
+    fn test_latest_published_returns_current_metadata() {
+        let s = setup();
+        let target = Address::generate(&s._env);
+        let hash1 = BytesN::from_array(&s._env, &[1u8; 32]);
+        let uri1 = String::from_str(&s._env, "ipfs://v1");
+        let hash2 = BytesN::from_array(&s._env, &[2u8; 32]);
+        let uri2 = String::from_str(&s._env, "ipfs://v2");
+
+        s.client.register_metadata(&target, &1, &hash1, &uri1);
+        s.client.update_metadata(&target, &2, &hash2, &uri2);
+
+        let latest = s.client.latest_published(&target).unwrap();
+        assert_eq!(latest.version, 2);
+        assert_eq!(latest.schema_hash, hash2);
+    }
+
+    #[test]
+    fn test_latest_published_returns_none_for_unknown_key() {
+        let s = setup();
+        let unknown = Address::generate(&s._env);
+        assert!(s.client.latest_published(&unknown).is_none());
+    }
+
+    #[test]
+    fn test_history_bounded_returns_limited_entries() {
+        let s = setup();
+        let target = Address::generate(&s._env);
+
+        let hash1 = BytesN::from_array(&s._env, &[1u8; 32]);
+        let hash2 = BytesN::from_array(&s._env, &[2u8; 32]);
+        let hash3 = BytesN::from_array(&s._env, &[3u8; 32]);
+        let uri = String::from_str(&s._env, "ipfs://doc");
+
+        s.client.register_metadata(&target, &1, &hash1, &uri);
+        s.client.update_metadata(&target, &2, &hash2, &uri);
+        s.client.update_metadata(&target, &3, &hash3, &uri);
+
+        // Request only the 2 most recent
+        let bounded = s.client.history_bounded(&target, &2);
+        assert_eq!(bounded.len(), 2);
+        // Ascending order: version 2, then version 3
+        assert_eq!(bounded.get(0).unwrap().version, 2);
+        assert_eq!(bounded.get(1).unwrap().version, 3);
+    }
+
+    #[test]
+    fn test_history_bounded_returns_empty_for_unknown_key() {
+        let s = setup();
+        let unknown = Address::generate(&s._env);
+        let bounded = s.client.history_bounded(&unknown, &5);
+        assert_eq!(bounded.len(), 0);
+    }
+
+    #[test]
+    fn test_history_bounded_zero_limit_returns_empty() {
+        let s = setup();
+        let target = Address::generate(&s._env);
+        let hash = BytesN::from_array(&s._env, &[1u8; 32]);
+        let uri = String::from_str(&s._env, "ipfs://v1");
+
+        s.client.register_metadata(&target, &1, &hash, &uri);
+
+        let bounded = s.client.history_bounded(&target, &0);
+        assert_eq!(bounded.len(), 0);
     }
 }

@@ -60,6 +60,10 @@ export interface UseWalletStatusReturn {
   provider: WalletProviderInfo | null;
   capabilities: WalletCapabilities;
   error: WalletStatusError | null;
+  /** Timestamp (ms since epoch) of the last successful balance/session refresh. */
+  lastUpdatedAt: number | null;
+  /** True while a manual refresh triggered by the user is in progress. */
+  isRefreshing: boolean;
   connect: (
     adapter?: WalletProviderAdapter,
     opts?: { network?: string },
@@ -166,12 +170,19 @@ export function useWalletStatus(
     svcRef.current.getMeta(),
   );
   const [error, setError] = useState<Error | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(
+    svcRef.current.getMeta()?.lastActiveAt ?? null,
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = svcRef.current!.subscribe((s, m, e) => {
       setSessionState(s);
       setMeta(m ?? null);
       setError(e ?? null);
+      if (m?.lastActiveAt) {
+        setLastUpdatedAt(m.lastActiveAt);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -201,7 +212,13 @@ export function useWalletStatus(
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
-    await svcRef.current!.reconnect();
+    setIsRefreshing(true);
+    try {
+      await svcRef.current!.reconnect();
+      setLastUpdatedAt(Date.now());
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
 
   return {
@@ -211,6 +228,8 @@ export function useWalletStatus(
     provider: meta?.provider ?? null,
     capabilities,
     error: statusError,
+    lastUpdatedAt,
+    isRefreshing,
     connect,
     disconnect,
     refresh,

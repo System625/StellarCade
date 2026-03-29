@@ -10,7 +10,7 @@ const localeNames: Record<Locale, string> = {
 };
 
 export const LocaleSwitcher: React.FC = () => {
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, resetLocale, t } = useI18n();
 
   const handleLocaleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLocale = event.target.value as Locale;
@@ -30,6 +30,14 @@ export const LocaleSwitcher: React.FC = () => {
           </option>
         ))}
       </select>
+      <button 
+        type="button" 
+        onClick={resetLocale} 
+        className="locale-reset-btn"
+        title={t('locale.reset', 'Reset to Default')}
+      >
+        ↺
+      </button>
     </div>
   );
 };

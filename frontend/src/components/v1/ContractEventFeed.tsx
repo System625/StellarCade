@@ -15,6 +15,11 @@ import {
   generateIdempotencyKey,
   InFlightRequestDedupe,
 } from '../../utils/v1/idempotency';
+import {
+  getPersistedEventFeedFilter,
+  persistEventFeedFilter,
+  clearEventFeedFilter,
+} from '../../services/global-state-store';
 import type { ContractEvent } from '../../types/contracts/events';
 import './ContractEventFeed.css';
 
@@ -81,6 +86,18 @@ export interface ContractEventFeedProps {
   virtualizationThreshold?: number;
   virtualizedItemHeight?: number;
   virtualizedOverscan?: number;
+  /**
+   * When true, the component persists the active event-type filter selection
+   * to sessionStorage and restores it on remount.
+   * @default false
+   */
+  persistFilters?: boolean;
+  /**
+   * Stable scope key used to isolate persisted filter state.
+   * Defaults to `contractId` when not provided.
+   * Use a custom value when multiple feeds share the same contractId.
+   */
+  feedScope?: string;
 }
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'idle';
@@ -197,7 +214,17 @@ export const ContractEventFeed: React.FC<ContractEventFeedProps> = ({
   virtualizationThreshold = DEFAULT_VIRTUALIZATION_THRESHOLD,
   virtualizedItemHeight = DEFAULT_VIRTUAL_ITEM_HEIGHT_PX,
   virtualizedOverscan = DEFAULT_VIRTUAL_OVERSCAN,
+  persistFilters = false,
+  feedScope,
 }) => {
+  // ── Filter persistence ─────────────────────────────────────────────────────
+  // Stable scope key isolates persisted state so different feeds don't collide.
+  const resolvedScope = feedScope ?? contractId;
+
+  // Internal active-filter state used when persistFilters=true.
+  // Null means "not yet initialised" (restored from storage on first render).
+  const [persistedActiveFilters, setPersistedActiveFilters] = useState<string[] | null>(null);
+  const filterInitialisedRef = useRef(false);
   const isContractIdValid =
     typeof contractId === 'string' && contractId.trim().length > 0;
 
@@ -223,6 +250,18 @@ export const ContractEventFeed: React.FC<ContractEventFeedProps> = ({
   const listRef = useRef<HTMLOListElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(DEFAULT_LIST_HEIGHT_PX);
+
+  // Restore persisted filter state on mount (or when scope changes).
+  useEffect(() => {
+    if (!persistFilters) {
+      filterInitialisedRef.current = true;
+      return;
+    }
+    const restored = getPersistedEventFeedFilter(resolvedScope);
+    setPersistedActiveFilters(restored ?? []);
+    filterInitialisedRef.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistFilters, resolvedScope]);
 
   useEffect(() => {
     const prev = prevListeningRef.current;
@@ -334,8 +373,34 @@ export const ContractEventFeed: React.FC<ContractEventFeedProps> = ({
     feedDedupeRef.current = new InFlightRequestDedupe();
     prevEventCountRef.current = 0;
     setScrollTop(0);
+    if (persistFilters) {
+      clearEventFeedFilter(resolvedScope);
+      setPersistedActiveFilters([]);
+    }
     clear();
-  }, [clear]);
+  }, [clear, persistFilters, resolvedScope]);
+
+  /**
+   * Persistence-aware filter toggle handler.
+   * When persistFilters=true, updates internal persisted state and writes to
+   * sessionStorage before forwarding the call to the external callback.
+   */
+  const handleFilterToggle = useCallback(
+    (value: string) => {
+      if (persistFilters) {
+        setPersistedActiveFilters((prev) => {
+          const current = prev ?? [];
+          const next = current.includes(value)
+            ? current.filter((v) => v !== value)
+            : [...current, value];
+          persistEventFeedFilter(resolvedScope, next);
+          return next;
+        });
+      }
+      onEventTypeFilterToggle?.(value);
+    },
+    [persistFilters, resolvedScope, onEventTypeFilterToggle],
+  );
 
   const shouldVirtualize =
     filteredEvents.length >= virtualizationThreshold &&
@@ -482,21 +547,29 @@ export const ContractEventFeed: React.FC<ContractEventFeedProps> = ({
         >
           {eventTypeFilters &&
             eventTypeFilters.length > 0 &&
-            eventTypeFilters.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                className={`cef__filter-chip cef__filter-chip--toggle${filter.active ? ' cef__filter-chip--active' : ''}`}
-                onClick={() => onEventTypeFilterToggle?.(filter.value)}
-                aria-pressed={filter.active}
-                data-testid={`${testId}-filter-${filter.value}`}
-              >
-                {filter.label}
-                {filter.count !== undefined && (
-                  <span className="cef__filter-chip__count">{filter.count}</span>
-                )}
-              </button>
-            ))}
+            eventTypeFilters.map((filter) => {
+              // When persistFilters=true, derive active state from internal
+              // persisted storage instead of the external prop, so filter
+              // selections survive remounts and refreshes within the session.
+              const isActive = persistFilters && persistedActiveFilters !== null
+                ? persistedActiveFilters.includes(filter.value)
+                : filter.active;
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`cef__filter-chip cef__filter-chip--toggle${isActive ? ' cef__filter-chip--active' : ''}`}
+                  onClick={() => handleFilterToggle(filter.value)}
+                  aria-pressed={isActive}
+                  data-testid={`${testId}-filter-${filter.value}`}
+                >
+                  {filter.label}
+                  {filter.count !== undefined && (
+                    <span className="cef__filter-chip__count">{filter.count}</span>
+                  )}
+                </button>
+              );
+            })}
           {eventTypeFilter && !eventTypeFilters && (
             <span className="cef__filter-chip">
               type: <strong>{eventTypeFilter}</strong>

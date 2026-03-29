@@ -9,6 +9,8 @@ jest.mock('../../src/config/stellar', () => ({
   server: { submitTransaction: jest.fn() },
   network: 'testnet',
   passphrase: 'Test SDF Network ; September 2015',
+  maxRetries: 2,
+  retryInterval: 10,
 }));
 
 jest.mock('@stellar/stellar-sdk', () => {
@@ -195,6 +197,71 @@ describe('stellar.service — submitTransaction', () => {
     const result = await submitTransaction('XDR==');
 
     expect(result.errorCode).toBe(STELLAR_ERRORS.SERVER_ERROR);
+  });
+
+  // --- Retry behavior ---
+
+  test('retries on TIMEOUT and eventually succeeds', async () => {
+    StellarSdk.TransactionBuilder.fromXDR.mockReturnValue(mockTx);
+    server.submitTransaction
+      .mockRejectedValueOnce(makeHorizonError({ status: 408 }))
+      .mockResolvedValueOnce(successResponse);
+
+    const result = await submitTransaction('XDR==');
+
+    expect(result.status).toBe('success');
+    expect(server.submitTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  test('retries on SERVER_ERROR and eventually succeeds', async () => {
+    StellarSdk.TransactionBuilder.fromXDR.mockReturnValue(mockTx);
+    server.submitTransaction
+      .mockRejectedValueOnce(makeHorizonError({ status: 500 }))
+      .mockResolvedValueOnce(successResponse);
+
+    const result = await submitTransaction('XDR==');
+
+    expect(result.status).toBe('success');
+    expect(server.submitTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  test('retries on RATE_LIMITED and eventually succeeds', async () => {
+    StellarSdk.TransactionBuilder.fromXDR.mockReturnValue(mockTx);
+    server.submitTransaction
+      .mockRejectedValueOnce(makeHorizonError({ status: 429 }))
+      .mockResolvedValueOnce(successResponse);
+
+    const result = await submitTransaction('XDR==');
+
+    expect(result.status).toBe('success');
+    expect(server.submitTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  test('gives up after maxRetries', async () => {
+    StellarSdk.TransactionBuilder.fromXDR.mockReturnValue(mockTx);
+    server.submitTransaction.mockRejectedValue(makeHorizonError({ status: 503 }));
+
+    const result = await submitTransaction('XDR==');
+
+    expect(result.status).toBe('error');
+    expect(server.submitTransaction).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+    expect(result.errorCode).toBe(STELLAR_ERRORS.SERVER_ERROR);
+  });
+
+  test('does NOT retry on TX_FAILED (400 with result codes)', async () => {
+    StellarSdk.TransactionBuilder.fromXDR.mockReturnValue(mockTx);
+    server.submitTransaction.mockRejectedValue(
+      makeHorizonError({
+        status: 400,
+        resultCodes: { transaction: 'tx_failed' },
+      })
+    );
+
+    const result = await submitTransaction('XDR==');
+
+    expect(result.status).toBe('error');
+    expect(server.submitTransaction).toHaveBeenCalledTimes(1);
+    expect(result.errorCode).toBe(STELLAR_ERRORS.TX_FAILED);
   });
 
   test('returns NETWORK_ERROR for connection refused (no response object)', async () => {

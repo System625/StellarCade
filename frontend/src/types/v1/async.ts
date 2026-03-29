@@ -20,6 +20,12 @@ export interface AsyncActionResult<T, E = Error> {
     isSuccess: boolean;
     isError: boolean;
     isIdle: boolean;
+    /**
+     * True while an action is in-flight and the duplicate-submit guard is active.
+     * Semantic alias for `isLoading` intended for form/button submission surfaces.
+     * Resets to false on both success and failure so legitimate retries are not blocked.
+     */
+    isPendingSubmit: boolean;
 }
 
 /**

@@ -66,9 +66,10 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="app-container">
-      <header className="app-header">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <header className="app-header" role="banner">
         <div className="logo">{t('app.title')}</div>
-        <nav>
+        <nav aria-label="Main navigation">
           <ul>
             <li><a href="/" className="active">{t('nav.lobby')}</a></li>
             <li><a href="/games">{t('nav.games')}</a></li>
@@ -78,13 +79,13 @@ const AppContent: React.FC = () => {
         <LocaleSwitcher />
       </header>
       
-      <main className="app-content">
+      <main className="app-content" id="main-content">
         <RouteErrorBoundary>
           <GameLobby />
         </RouteErrorBoundary>
       </main>
 
-      <footer className="app-footer">
+      <footer className="app-footer" role="contentinfo">
         <div className="footer-content">
           <p>{t('footer.copyright')}</p>
           <div className="footer-links">

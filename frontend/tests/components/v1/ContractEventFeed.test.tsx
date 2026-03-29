@@ -2,6 +2,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ContractEventFeed } from '@/components/v1/ContractEventFeed';
 import type { ContractEventFeedProps } from '@/components/v1/ContractEventFeed';
 import type { ContractEvent } from '@/types/contracts/events';
+import {
+  getPersistedEventFeedFilter,
+  persistEventFeedFilter,
+  clearEventFeedFilter,
+} from '@/services/global-state-store';
 
 const mockStart = vi.fn();
 const mockStop = vi.fn();
@@ -82,6 +87,7 @@ beforeEach(() => {
   mockStart.mockReset();
   mockStop.mockReset();
   mockClear.mockReset();
+  sessionStorage.clear();
 });
 
 describe('ContractEventFeed - rendering', () => {
@@ -462,6 +468,106 @@ describe('ContractEventFeed - accessibility', () => {
     expect(
       screen.queryByRole('button', { name: /view event static/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ── Filter persistence ─────────────────────────────────────────────────────────
+
+const filterChips: ContractEventFeedProps['eventTypeFilters'] = [
+  { label: 'Coin Flip', value: 'coin_flip', active: false },
+  { label: 'Transfer', value: 'transfer', active: false },
+];
+
+describe('ContractEventFeed - filter persistence', () => {
+  it('persists active filter to sessionStorage when persistFilters=true and a chip is clicked', () => {
+    const onToggle = vi.fn();
+    renderFeed({
+      eventTypeFilters: filterChips,
+      onEventTypeFilterToggle: onToggle,
+      persistFilters: true,
+      feedScope: 'test-scope-persist',
+    });
+
+    fireEvent.click(screen.getByTestId('contract-event-feed-filter-coin_flip'));
+
+    const stored = getPersistedEventFeedFilter('test-scope-persist');
+    expect(stored).toContain('coin_flip');
+    // External callback still fires
+    expect(onToggle).toHaveBeenCalledWith('coin_flip');
+  });
+
+  it('restores persisted filter state on remount', () => {
+    persistEventFeedFilter('restore-scope', ['transfer']);
+
+    renderFeed({
+      eventTypeFilters: filterChips,
+      persistFilters: true,
+      feedScope: 'restore-scope',
+    });
+
+    // The restored chip should render as active (aria-pressed="true")
+    const transferBtn = screen.getByTestId('contract-event-feed-filter-transfer');
+    expect(transferBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // The non-restored chip should be inactive
+    const coinFlipBtn = screen.getByTestId('contract-event-feed-filter-coin_flip');
+    expect(coinFlipBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('different feedScopes do not share filter state', () => {
+    persistEventFeedFilter('scope-a', ['coin_flip']);
+    persistEventFeedFilter('scope-b', ['transfer']);
+
+    const storedA = getPersistedEventFeedFilter('scope-a');
+    const storedB = getPersistedEventFeedFilter('scope-b');
+
+    expect(storedA).toContain('coin_flip');
+    expect(storedA).not.toContain('transfer');
+    expect(storedB).toContain('transfer');
+    expect(storedB).not.toContain('coin_flip');
+  });
+
+  it('default filter behavior is unchanged when persistFilters=false', () => {
+    renderFeed({
+      eventTypeFilters: [
+        { label: 'Coin Flip', value: 'coin_flip', active: true },
+        { label: 'Transfer', value: 'transfer', active: false },
+      ],
+      persistFilters: false,
+    });
+
+    // active prop from parent is respected
+    expect(screen.getByTestId('contract-event-feed-filter-coin_flip')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('contract-event-feed-filter-transfer')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clears persisted filter state when clear button is clicked', () => {
+    persistEventFeedFilter('clear-scope', ['coin_flip']);
+    mockEvents = [makeEvent()];
+
+    renderFeed({
+      eventTypeFilters: filterChips,
+      persistFilters: true,
+      feedScope: 'clear-scope',
+    });
+
+    fireEvent.click(screen.getByTestId('contract-event-feed-clear'));
+    expect(mockClear).toHaveBeenCalledTimes(1);
+
+    const stored = getPersistedEventFeedFilter('clear-scope');
+    // After clear, the persisted entry is removed — same as first-time visitor
+    expect(stored).toBeNull();
+  });
+
+  it('returns null for scope with no persisted state (first-time visitor)', () => {
+    const stored = getPersistedEventFeedFilter('brand-new-scope');
+    expect(stored).toBeNull();
+  });
+
+  it('clearEventFeedFilter removes persisted state for a scope', () => {
+    persistEventFeedFilter('to-clear', ['coin_flip']);
+    clearEventFeedFilter('to-clear');
+    expect(getPersistedEventFeedFilter('to-clear')).toBeNull();
   });
 });
 

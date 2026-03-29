@@ -81,6 +81,15 @@ export interface TxStatusProvider {
 // Metadata
 // ---------------------------------------------------------------------------
 
+export interface TxRetryAttempt {
+  /** Which retry attempt (1-based). */
+  attempt: number;
+  /** Epoch ms when this attempt was made. */
+  timestamp: number;
+  /** Reason for the retry, if known. */
+  reason?: string;
+}
+
 export interface TxStatusMeta {
   /** The transaction hash being tracked. */
   hash: string;
@@ -94,6 +103,12 @@ export interface TxStatusMeta {
   settledAt?: number;
   /** Structured error if phase is FAILED; undefined otherwise. */
   error?: TxStatusError;
+  /** Number of times this transaction was retried. */
+  retryCount?: number;
+  /** Epoch ms of the most recent retry attempt. */
+  lastAttemptAt?: number;
+  /** Ordered history of retry attempts. */
+  retryHistory?: TxRetryAttempt[];
 }
 
 // ---------------------------------------------------------------------------

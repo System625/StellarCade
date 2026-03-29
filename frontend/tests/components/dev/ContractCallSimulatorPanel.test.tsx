@@ -99,4 +99,52 @@ describe("ContractCallSimulatorPanel", () => {
       ),
     ).not.toBeNull();
   });
+
+  it("creates a log entry when a mock is registered", () => {
+    if (import.meta.env.PROD) return;
+    render(<ContractCallSimulatorPanel />);
+    fireEvent.click(screen.getByTestId("contract-call-simulator-toggle"));
+
+    fireEvent.change(screen.getByTestId("contract-call-simulator-contract"), {
+      target: { value: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" },
+    });
+    fireEvent.change(screen.getByTestId("contract-call-simulator-method"), {
+      target: { value: "test_method" },
+    });
+    fireEvent.click(screen.getByTestId("contract-call-simulator-register"));
+
+    const entries = screen.getAllByTestId("contract-call-simulator-log-entry");
+    expect(entries.length).toBe(1);
+    expect(entries[0]).toHaveTextContent("test_method");
+  });
+
+  it("clears log entries when clear log is clicked", () => {
+    if (import.meta.env.PROD) return;
+    render(<ContractCallSimulatorPanel />);
+    fireEvent.click(screen.getByTestId("contract-call-simulator-toggle"));
+
+    fireEvent.change(screen.getByTestId("contract-call-simulator-contract"), {
+      target: { value: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" },
+    });
+    fireEvent.change(screen.getByTestId("contract-call-simulator-method"), {
+      target: { value: "m1" },
+    });
+    fireEvent.click(screen.getByTestId("contract-call-simulator-register"));
+
+    fireEvent.click(screen.getByTestId("contract-call-simulator-log-clear"));
+
+    expect(screen.queryByTestId("contract-call-simulator-log-entry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("contract-call-simulator-log-empty")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no log entries exist", () => {
+    if (import.meta.env.PROD) return;
+    render(<ContractCallSimulatorPanel />);
+    fireEvent.click(screen.getByTestId("contract-call-simulator-toggle"));
+
+    expect(screen.getByTestId("contract-call-simulator-log-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("contract-call-simulator-log-empty")).toHaveTextContent(
+      "No requests logged yet",
+    );
+  });
 });

@@ -33,6 +33,15 @@ export interface FormErrorSummaryProps {
   title?: string;
   className?: string;
   testId?: string;
+  /**
+   * When true, indicates a submission is in progress.
+   * Shows a pending indicator and dims the stale error list so users understand
+   * the form is being re-submitted. Errors are not hidden — they remain accessible
+   * as context until the new submission resolves.
+   */
+  isPendingSubmit?: boolean;
+  /** Label shown in the pending indicator. @default 'Submitting…' */
+  pendingLabel?: string;
 }
 
 function fieldToDomId(prefix: string, field: string): string {
@@ -46,6 +55,8 @@ export const FormErrorSummary: React.FC<FormErrorSummaryProps> = ({
   title = 'Please fix the following:',
   className = '',
   testId = 'form-error-summary',
+  isPendingSubmit = false,
+  pendingLabel = 'Submitting…',
 }) => {
   const baseId = useId().replace(/:/g, '');
 
@@ -75,7 +86,7 @@ export const FormErrorSummary: React.FC<FormErrorSummaryProps> = ({
     [focusField],
   );
 
-  if (!errors.length) {
+  if (!errors.length && !isPendingSubmit) {
     return null;
   }
 
@@ -88,6 +99,7 @@ export const FormErrorSummary: React.FC<FormErrorSummaryProps> = ({
       role="region"
       aria-labelledby={`${testId}-title-${baseId}`}
       aria-describedby={listId}
+      aria-busy={isPendingSubmit}
     >
       <div
         id={`${testId}-title-${baseId}`}
@@ -95,45 +107,59 @@ export const FormErrorSummary: React.FC<FormErrorSummaryProps> = ({
       >
         {title}
       </div>
-      <ul
-        id={listId}
-        className="form-error-summary__list"
-        role="list"
-        aria-live="polite"
-        aria-relevant="additions removals"
-      >
-        {errors.map((err, i) => {
-          const targetId = fieldToDomId(fieldIdPrefix, err.field);
-          return (
-            <li
-              key={`${err.field}-${i}`}
-              className="form-error-summary__item"
-              role="listitem"
-            >
-              <a
-                href={`#${targetId}`}
-                className="form-error-summary__link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  focusField(err.field);
-                }}
-                onKeyDown={(e) => onKeyJump(e, err.field)}
-                data-testid={`${testId}-link-${err.field}`}
-                aria-describedby={`${testId}-msg-${baseId}-${i}`}
+
+      {isPendingSubmit && (
+        <div
+          className="form-error-summary__pending"
+          role="status"
+          aria-live="polite"
+          data-testid={`${testId}-pending`}
+        >
+          {pendingLabel}
+        </div>
+      )}
+
+      {errors.length > 0 && (
+        <ul
+          className={`form-error-summary__list${isPendingSubmit ? ' form-error-summary__list--dimmed' : ''}`}
+          id={listId}
+          role="list"
+          aria-live="polite"
+          aria-relevant="additions removals"
+        >
+          {errors.map((err, i) => {
+            const targetId = fieldToDomId(fieldIdPrefix, err.field);
+            return (
+              <li
+                key={`${err.field}-${i}`}
+                className="form-error-summary__item"
+                role="listitem"
               >
-                <span className="form-error-summary__field">{err.field}</span>
-              </a>
-              <span
-                id={`${testId}-msg-${baseId}-${i}`}
-                className="form-error-summary__message"
-                role="alert"
-              >
-                {err.message}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+                <a
+                  href={`#${targetId}`}
+                  className="form-error-summary__link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    focusField(err.field);
+                  }}
+                  onKeyDown={(e) => onKeyJump(e, err.field)}
+                  data-testid={`${testId}-link-${err.field}`}
+                  aria-describedby={`${testId}-msg-${baseId}-${i}`}
+                >
+                  <span className="form-error-summary__field">{err.field}</span>
+                </a>
+                <span
+                  id={`${testId}-msg-${baseId}-${i}`}
+                  className="form-error-summary__message"
+                  role="alert"
+                >
+                  {err.message}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 };

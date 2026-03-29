@@ -110,4 +110,79 @@ describe('ContractActionButton', () => {
 
     expect(button).toHaveFocus();
   });
+
+  it('renders disabledReason near the button when disabled with a reason', () => {
+    const action = vi.fn().mockResolvedValue({});
+
+    render(
+      <ContractActionButton
+        label="Execute"
+        action={action}
+        walletConnected={true}
+        networkSupported={true}
+        disabled={true}
+        disabledReason="Game has not started yet."
+      />,
+    );
+
+    expect(screen.getByTestId('contract-action-button')).toBeDisabled();
+    expect(screen.getByTestId('contract-action-button-disabled-reason')).toHaveTextContent(
+      'Game has not started yet.',
+    );
+    expect(screen.getByTestId('contract-action-button')).toHaveAttribute(
+      'aria-describedby',
+      expect.stringContaining('contract-action-button-disabled-reason'),
+    );
+  });
+
+  it('does not render disabledReason when button is enabled', () => {
+    const action = vi.fn().mockResolvedValue({});
+
+    render(
+      <ContractActionButton
+        label="Execute"
+        action={action}
+        walletConnected={true}
+        networkSupported={true}
+        disabled={false}
+        disabledReason="Should not appear"
+      />,
+    );
+
+    expect(screen.queryByTestId('contract-action-button-disabled-reason')).not.toBeInTheDocument();
+  });
+
+  it('does not render disabledReason when disabled but no reason provided', () => {
+    const action = vi.fn().mockResolvedValue({});
+
+    render(
+      <ContractActionButton
+        label="Execute"
+        action={action}
+        walletConnected={true}
+        networkSupported={true}
+        disabled={true}
+      />,
+    );
+
+    expect(screen.queryByTestId('contract-action-button-disabled-reason')).not.toBeInTheDocument();
+  });
+
+  it('precondition reason takes priority over disabledReason when wallet is not connected', () => {
+    const action = vi.fn().mockResolvedValue({});
+
+    render(
+      <ContractActionButton
+        label="Execute"
+        action={action}
+        walletConnected={false}
+        networkSupported={true}
+        disabled={true}
+        disabledReason="Custom reason"
+      />,
+    );
+
+    expect(screen.getByTestId('contract-action-button-precondition')).toBeInTheDocument();
+    expect(screen.queryByTestId('contract-action-button-disabled-reason')).not.toBeInTheDocument();
+  });
 });

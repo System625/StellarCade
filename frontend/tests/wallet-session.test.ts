@@ -208,6 +208,95 @@ describe("WalletSessionService", () => {
     );
   });
 
+  it("sessionDropped is false by default", () => {
+    const service = new WalletSessionService();
+    expect(service.getSessionDropped()).toBe(false);
+  });
+
+  it("marks session as dropped after terminal refresh failure", async () => {
+    const service = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => 100,
+    });
+    const adapter = new MockAdapter();
+    adapter.willRejectSign = true;
+    service.setProviderAdapter(adapter as any);
+
+    await service.connect({ network: "TESTNET" });
+    expect(service.getSessionDropped()).toBe(false);
+
+    await expect(service.silentRefresh({ maxAttempts: 1 })).rejects.toBeDefined();
+    expect(service.getSessionDropped()).toBe(true);
+  });
+
+  it("exposes sessionDropped=true via subscriber callback after terminal failure", async () => {
+    const service = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => 100,
+    });
+    const adapter = new MockAdapter();
+    adapter.willRejectSign = true;
+    service.setProviderAdapter(adapter as any);
+
+    await service.connect({ network: "TESTNET" });
+
+    const droppedValues: boolean[] = [];
+    service.subscribe((_s, _m, _e, _rs, sessionDropped) => {
+      if (sessionDropped !== undefined) droppedValues.push(sessionDropped);
+    });
+
+    await expect(service.silentRefresh({ maxAttempts: 1 })).rejects.toBeDefined();
+    expect(droppedValues).toContain(true);
+  });
+
+  it("clears sessionDropped flag after successful reconnect", async () => {
+    const now = { value: 100 };
+    const service = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => now.value,
+    });
+    const failingAdapter = new MockAdapter();
+    failingAdapter.willRejectSign = true;
+    service.setProviderAdapter(failingAdapter as any);
+
+    await service.connect({ network: "TESTNET" });
+    await expect(service.silentRefresh({ maxAttempts: 1 })).rejects.toBeDefined();
+    expect(service.getSessionDropped()).toBe(true);
+
+    // Reconnect with a working adapter
+    const goodAdapter = new MockAdapter();
+    now.value = 200;
+    const reloaded = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => now.value,
+    });
+    reloaded.setProviderAdapter(goodAdapter as any);
+    // Must have a stored session to reconnect — connect first
+    await reloaded.connect({ network: "TESTNET" });
+
+    const reloaded2 = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => now.value,
+    });
+    reloaded2.setProviderAdapter(goodAdapter as any);
+    await reloaded2.reconnect();
+    expect(reloaded2.getSessionDropped()).toBe(false);
+  });
+
+  it("does not mark session as dropped on user-initiated disconnect", async () => {
+    const service = new WalletSessionService({
+      supportedNetworks: ["TESTNET"],
+      now: () => 100,
+    });
+    const adapter = new MockAdapter();
+    service.setProviderAdapter(adapter as any);
+
+    await service.connect({ network: "TESTNET" });
+    await service.disconnect();
+
+    expect(service.getSessionDropped()).toBe(false);
+  });
+
   it("stale session is removed", async () => {
     vi.useFakeTimers();
     const service = new WalletSessionService({
