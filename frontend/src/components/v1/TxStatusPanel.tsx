@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { TxPhase, TxStatusMeta, TxStatusError } from '../../types/tx-status';
+import { EnvironmentBadge } from './EnvironmentBadge';
 import { formatAddress, formatDate, formatTxTimestamp, truncateHash } from '../../utils/v1/formatters';
 import './TxStatusPanel.css';
 
@@ -227,7 +228,12 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
                 <span className="tx-status-panel__title" data-testid={`${testId}-title`}>
                     {isIdle ? 'Ready to Submit' : 'Transaction Status'}
                 </span>
-                <span className={badgeClass} data-testid={`${testId}-badge`}>{phase}</span>
+                <div className="tx-status-panel__header-badges">
+                  <span className={badgeClass} data-testid={`${testId}-badge`}>{phase}</span>
+                  {network && (
+                    <EnvironmentBadge environment={network} size="small" testId={`${testId}-env-badge`} />
+                  )}
+                </div>
             </div>
 
             {!isIdle && (

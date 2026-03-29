@@ -10,6 +10,7 @@
 
 import React, { useCallback } from 'react';
 import { SkeletonBase } from './LoadingSkeletonSet';
+import { EnvironmentBadge } from './EnvironmentBadge';
 import {
   BADGE_VARIANT_MAP,
   STATUS_LABEL_MAP,
@@ -393,13 +394,19 @@ export const WalletStatusCard: React.FC<WalletStatusCardProps> = ({
       role="region"
       aria-label="Wallet status"
     >
-      {/* ── Header: badge + provider ── */}
+      {/* ── Header: badge + provider + environment ── */}
       <div className="wallet-status-card__header">
         <StatusBadge variant={badgeVariant} label={statusLabel} />
 
         {sanitizedProviderName !== null && (
           <div className="wallet-status-card__provider">
             <span>{sanitizedProviderName}</span>
+          </div>
+        )}
+
+        {sanitizedNetwork !== null && (
+          <div className="wallet-status-card__environment">
+            <EnvironmentBadge environment={sanitizedNetwork} size="small" />
           </div>
         )}
       </div>
