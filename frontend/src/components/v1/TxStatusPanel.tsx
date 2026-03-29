@@ -1,7 +1,101 @@
 import React, { useState, useCallback } from 'react';
 import { TxPhase, TxStatusMeta, TxStatusError } from '../../types/tx-status';
-import { formatAddress, formatDate } from '../../utils/v1/formatters';
+import { formatAddress, formatDate, formatTxTimestamp, truncateHash } from '../../utils/v1/formatters';
 import './TxStatusPanel.css';
+
+/**
+ * TxReceiptView Component
+ *
+ * Renders a clean, minimal transaction receipt suitable for printing.
+ * Only displays high-signal data: hash, status, amount, asset, sender, recipient, timestamp, network.
+ */
+interface TxReceiptViewProps {
+  meta: TxStatusMeta;
+  phase: TxPhase;
+  network?: string;
+  asset?: string;
+  amount?: string | number | bigint;
+  sender?: string;
+  recipient?: string;
+  testId?: string;
+}
+
+const TxReceiptView: React.FC<TxReceiptViewProps> = ({
+  meta,
+  phase,
+  network,
+  asset,
+  amount,
+  sender,
+  recipient,
+  testId = 'tx-receipt',
+}) => {
+  return (
+    <div className="tx-status-panel__receipt" data-testid={testId}>
+      <h2 className="tx-status-panel__receipt-title">Transaction Receipt</h2>
+
+      <div className="tx-status-panel__receipt-row">
+        <span className="tx-status-panel__receipt-label">Transaction Hash</span>
+        <span className="tx-status-panel__receipt-value tx-status-panel__receipt-value--hash" data-testid={`${testId}-hash`}>
+          {truncateHash(meta.hash)}
+        </span>
+      </div>
+
+      <div className="tx-status-panel__receipt-row">
+        <span className="tx-status-panel__receipt-label">Status</span>
+        <span className="tx-status-panel__receipt-value" data-testid={`${testId}-status`}>
+          {phase}
+        </span>
+      </div>
+
+      {amount !== undefined && (
+        <div className="tx-status-panel__receipt-row">
+          <span className="tx-status-panel__receipt-label">Amount</span>
+          <span className="tx-status-panel__receipt-value" data-testid={`${testId}-amount`}>
+            {typeof amount === 'bigint' || typeof amount === 'number' ? amount.toString() : amount}
+            {asset ? ` ${asset}` : ''}
+          </span>
+        </div>
+      )}
+
+      {sender && (
+        <div className="tx-status-panel__receipt-row">
+          <span className="tx-status-panel__receipt-label">Sender</span>
+          <span className="tx-status-panel__receipt-value" data-testid={`${testId}-sender`}>
+            {truncateHash(sender)}
+          </span>
+        </div>
+      )}
+
+      {recipient && (
+        <div className="tx-status-panel__receipt-row">
+          <span className="tx-status-panel__receipt-label">Recipient</span>
+          <span className="tx-status-panel__receipt-value" data-testid={`${testId}-recipient`}>
+            {truncateHash(recipient)}
+          </span>
+        </div>
+      )}
+
+      <div className="tx-status-panel__receipt-row">
+        <span className="tx-status-panel__receipt-label">Timestamp</span>
+        <span className="tx-status-panel__receipt-value" data-testid={`${testId}-timestamp`}>
+          {formatTxTimestamp(meta.submittedAt)}
+        </span>
+      </div>
+
+      {network && (
+        <div className="tx-status-panel__receipt-row">
+          <span className="tx-status-panel__receipt-label">Network</span>
+          <span className="tx-status-panel__receipt-value" data-testid={`${testId}-network`}>
+            {network}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+TxReceiptView.displayName = 'TxReceiptView';
 
 export interface TxStatusPanelProps {
   /** Current lifecycle phase of the transaction */
@@ -22,11 +116,21 @@ export interface TxStatusPanelProps {
   className?: string;
   /** Test identifier for component queries */
   testId?: string;
+  /** Network name for receipt display */
+  network?: string;
+  /** Asset symbol for receipt display */
+  asset?: string;
+  /** Amount for receipt display */
+  amount?: string | number | bigint;
+  /** Sender address for receipt display */
+  sender?: string;
+  /** Recipient address for receipt display */
+  recipient?: string;
 }
 
 /**
  * TxStatusPanel Component
- * 
+ *
  * Renders a visual timeline and metadata for a transaction's lifecycle.
  * Consume transaction state and metadata provided by application services.
  */
@@ -39,7 +143,12 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
   explorerUrl,
   showCopyButton = true,
   className = '',
-  testId = 'tx-status-panel'
+  testId = 'tx-status-panel',
+  network,
+  asset,
+  amount,
+  sender,
+  recipient,
 }) => {
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
 
@@ -66,6 +175,17 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
     }
     onExplorerLink?.(meta.hash);
   }, [meta?.hash, explorerUrl, onExplorerLink]);
+
+  const canPrint = Boolean(meta?.hash && !isIdle);
+
+  const handlePrint = useCallback(() => {
+    if (!canPrint) return;
+    if (typeof window !== 'undefined' && window.print) {
+      window.print();
+    } else {
+      console.warn('Print functionality is not available in this environment');
+    }
+  }, [canPrint]);
 
     const containerClasses = [
         'tx-status-panel',
@@ -190,6 +310,18 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
           View in Explorer &rarr;
         </button>
       )}
+
+      {canPrint && !compact && (
+        <button
+          type="button"
+          className="tx-status-panel__print-btn"
+          onClick={handlePrint}
+          aria-label="Print transaction receipt"
+          data-testid={`${testId}-print-btn`}
+        >
+          Print Receipt
+        </button>
+      )}
     </div>
   )}
 
@@ -197,6 +329,19 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
     <div className="tx-status-panel__empty-state">
       Submit a transaction to track its progress in real-time.
     </div>
+  )}
+
+  {meta && !isIdle && (
+    <TxReceiptView
+      meta={meta}
+      phase={phase}
+      network={network}
+      asset={asset}
+      amount={amount}
+      sender={sender}
+      recipient={recipient}
+      testId={`${testId}-receipt`}
+    />
   )}
 </div>
 );

@@ -325,3 +325,37 @@ export function formatDate(
     return fallback;
   }
 }
+
+/**
+ * Format a transaction timestamp for receipt display.
+ *
+ * Returns a full date-time string suitable for receipts (e.g., "Mar 29, 2026, 3:45 PM").
+ * Accepts ms or seconds (if value < 1e12, treated as seconds). Invalid input returns fallback.
+ */
+export function formatTxTimestamp(
+  timestamp: number | null | undefined,
+  options: FormatDateOptions = {},
+): string {
+  return formatDate(timestamp, {
+    ...options,
+    dateStyle: options.dateStyle ?? "medium",
+    timeStyle: options.timeStyle ?? "short",
+  });
+}
+
+/**
+ * Truncate a transaction hash for receipt display.
+ *
+ * Returns a shortened hash (e.g., "GABC...xyz1").
+ * Validates hash-like shape (length 12-64, base32 chars). Invalid input returns FALLBACK_ADDRESS.
+ */
+export function truncateHash(
+  hash: string | null | undefined,
+  options: FormatAddressOptions = {},
+): string {
+  return formatAddress(hash, {
+    startChars: options.startChars ?? 8,
+    endChars: options.endChars ?? 8,
+    separator: options.separator ?? "...",
+  });
+}
