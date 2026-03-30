@@ -53,6 +53,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const abortSignalWithAny = AbortSignal as typeof AbortSignal & {
+    any?: (signals: AbortSignal[]) => AbortSignal;
+  };
+
+  if (typeof abortSignalWithAny.any === "function") {
+    return abortSignalWithAny.any(signals);
+  }
+
+  const controller = new AbortController();
+  const onAbort = (event: Event) => {
+    const source = event.target as AbortSignal;
+    controller.abort(source.reason);
+  };
+  signals.forEach((signal) => signal.addEventListener("abort", onAbort, { once: true }));
+  return controller.signal;
+}
+
 function normalizeApiClientError(
   error: AppError,
   overrides: {
@@ -253,18 +271,7 @@ export class ApiClient {
 
       if (requestSignal) {
         // Use AbortSignal.any() if available (modern browsers and Node 20+)
-        if ("any" in AbortSignal && typeof AbortSignal.any === "function") {
-          requestSignal = (AbortSignal as any).any([
-            requestSignal,
-            controller.signal,
-          ]);
-        } else {
-          // Fallback manual link
-          requestSignal.addEventListener("abort", () =>
-            controller.abort(requestSignal?.reason),
-          );
-          requestSignal = controller.signal;
-        }
+        requestSignal = combineAbortSignals([requestSignal, controller.signal]);
       } else {
         requestSignal = controller.signal;
       }
