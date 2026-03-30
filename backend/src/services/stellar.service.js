@@ -213,14 +213,21 @@ const submitTransaction = async (transactionXDR) => {
     };
   }
 
+  const normalizedMaxRetries =
+    Number.isInteger(maxRetries) && maxRetries >= 0 ? maxRetries : 0;
+  const normalizedRetryInterval =
+    Number.isFinite(retryInterval) && retryInterval >= 0 ? retryInterval : 0;
+
   // --- 2. Submit to Horizon with Retry Policy ---
   let attempt = 0;
   let lastError = null;
 
-  while (attempt <= maxRetries) {
+  while (attempt <= normalizedMaxRetries) {
     if (attempt > 0) {
-      logger.info(`Retrying transaction submission (attempt ${attempt}/${maxRetries})...`);
-      await sleep(retryInterval);
+      logger.info(
+        `Retrying transaction submission (attempt ${attempt}/${normalizedMaxRetries})...`
+      );
+      await sleep(normalizedRetryInterval);
     } else {
       logger.info('Submitting transaction to Stellar network...');
     }
@@ -255,7 +262,7 @@ const submitTransaction = async (transactionXDR) => {
         STELLAR_ERRORS.NETWORK_ERROR,
       ].includes(parsed.code);
 
-      if (!retriable || attempt >= maxRetries) {
+      if (!retriable || attempt >= normalizedMaxRetries) {
         logger.error(
           `Transaction submission failed. code=${parsed.code} httpStatus=${parsed.httpStatus} message=${parsed.message} attempts=${attempt + 1}`,
           { resultCodes: parsed.resultCodes }
@@ -270,6 +277,12 @@ const submitTransaction = async (transactionXDR) => {
     }
   }
 
+  const resolvedError = lastError || {
+    code: STELLAR_ERRORS.NETWORK_ERROR,
+    message: 'Transaction submission failed before any network attempt.',
+    resultCodes: null,
+  };
+
   return {
     status: 'error',
     hash: null,
@@ -277,9 +290,9 @@ const submitTransaction = async (transactionXDR) => {
     successful: false,
     envelopeXDR: null,
     resultXDR: null,
-    errorCode: lastError.code,
-    errorMessage: lastError.message,
-    resultCodes: lastError.resultCodes,
+    errorCode: resolvedError.code,
+    errorMessage: resolvedError.message,
+    resultCodes: resolvedError.resultCodes,
   };
 };
 
