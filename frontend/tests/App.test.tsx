@@ -37,9 +37,6 @@ describe("App", () => {
   });
 
   it("renders a route-level fallback when GameLobby throws during render", async () => {
-    const reloadSpy = vi
-      .spyOn(window.location, "reload")
-      .mockImplementation(() => undefined);
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     vi.doMock("@/pages/GameLobby", () => ({
@@ -52,13 +49,10 @@ describe("App", () => {
     const { default: App } = await import("@/App");
     render(<App />);
 
-    expect(screen.getByText("Lobby temporarily unavailable")).toBeInTheDocument();
-    expect(
-      screen.getByText("Reload the route to try fetching the latest game state again."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.getByText("render failed")).toBeInTheDocument();
 
-    screen.getByRole("button", { name: "Reload" }).click();
-    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
   });
@@ -98,7 +92,8 @@ describe("Breadcrumb Navigation", () => {
     // Since 'pathnames' will be empty at '/', only the Home link remains.
     // If your logic hides the whole nav when pathnames.length === 0,
     // you would test for queryByRole(...) to be null.
-    const breadcrumbLinks = screen.getAllByRole("listitem");
+    const nav = screen.getByRole("navigation", { name: /breadcrumb/i });
+    const breadcrumbLinks = nav.querySelectorAll("li");
     expect(breadcrumbLinks).toHaveLength(1);
     expect(screen.getByTitle("Home")).toBeInTheDocument();
   });

@@ -28,6 +28,27 @@ exports[`WalletStatusCard > Snapshots > matches snapshot for connected state 1`]
         Freighter
       </span>
     </div>
+    <div
+      class="wallet-status-card__environment"
+    >
+      <span
+        aria-label="Network environment: Testnet"
+        class="environment-badge environment-badge--testnet environment-badge--small"
+        data-environment="testnet"
+        data-testid="environment-badge"
+        role="status"
+      >
+        <span
+          aria-hidden="true"
+          class="environment-badge__icon"
+        />
+        <span
+          class="environment-badge__label"
+        >
+          Testnet
+        </span>
+      </span>
+    </div>
   </div>
   <div
     class="wallet-status-card__body"

@@ -419,36 +419,33 @@ describe('ApiClient — cancellation and timeout', () => {
     vi.useFakeTimers();
     const client = new ApiClient();
 
-    global.fetch = vi.fn().mockImplementation((_url, init) => {
-      return new Promise((_resolve, reject) => {
-        if (init.signal?.aborted) {
-          const err = init.signal.reason === 'timeout' 
-            ? new Error('timeout') 
-            : new DOMException('Aborted', 'AbortError');
-          return reject(err);
-        }
-        init.signal?.addEventListener('abort', () => {
-          const err = init.signal.reason === 'timeout' 
-            ? new Error('timeout') 
-            : new DOMException('Aborted', 'AbortError');
-          reject(err);
+    try {
+      global.fetch = vi.fn().mockImplementation((_url, init) => {
+        return new Promise((_resolve, reject) => {
+          if (init.signal?.aborted) {
+            return reject(new DOMException('Aborted', 'AbortError'));
+          }
+          init.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
         });
       });
-    });
 
-    const promise = client.getGames({ timeout: 1000 });
+      const promise = client.getGames({ timeout: 1000 });
 
-    // Fast-forward time
-    await vi.advanceTimersByTimeAsync(1100);
+      // Fast-forward time
+      await vi.advanceTimersByTimeAsync(1100);
 
-    const result = await promise;
+      const result = await promise;
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.code).toBe('API_REQUEST_TIMEOUT');
-      expect(result.error.message).toContain('timed out');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.code).toBe('API_REQUEST_TIMEOUT');
+        expect(result.error.message).toContain('timed out');
+      }
+    } finally {
+      vi.useRealTimers();
     }
-    vi.useRealTimers();
   });
 
   it('respects pre-aborted signal', async () => {

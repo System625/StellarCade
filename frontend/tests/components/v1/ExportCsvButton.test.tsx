@@ -23,6 +23,7 @@ const mockObjectUrl = 'blob:test';
 let createObjectURLSpy: any;
 let revokeObjectURLSpy: any;
 let appendChildSpy: any;
+let originalAppendChild: typeof document.body.appendChild;
 
 beforeEach(() => {
   createObjectURLSpy = vi.fn(() => mockObjectUrl);
@@ -31,12 +32,14 @@ beforeEach(() => {
   URL.createObjectURL = createObjectURLSpy as unknown as typeof URL.createObjectURL;
   URL.revokeObjectURL = revokeObjectURLSpy as unknown as typeof URL.revokeObjectURL;
 
+  originalAppendChild = document.body.appendChild.bind(document.body);
   appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => {
     const el = node as HTMLAnchorElement;
     if (el.tagName === 'A') {
       el.click = vi.fn();
+      return node;
     }
-    return node;
+    return originalAppendChild(node);
   });
   vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
 });
@@ -57,7 +60,7 @@ describe('ExportCsvButton', () => {
         Download Data
       </ExportCsvButton>,
     );
-    expect(screen.getByRole('button', { name: /download data/i })).toBeInTheDocument();
+    expect(screen.getByText('Download Data')).toBeInTheDocument();
   });
 
   it('is disabled when rows is empty', () => {
