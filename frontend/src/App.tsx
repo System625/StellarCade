@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 import GameLobby from './pages/GameLobby';
 import { RouteErrorBoundary } from './components/v1/RouteErrorBoundary';
 import ProfileSettings from './pages/ProfileSettings';
@@ -26,6 +26,122 @@ const toneLabelMap = {
   warning: 'Warning',
   error: 'Error',
 } as const;
+
+// ── Reusable Drawer Framework (#475) ─────────────────────────────────────────
+
+export interface DrawerProps {
+  /** Whether the drawer is open. */
+  open: boolean;
+  /** Called when the drawer should close (backdrop click, Escape, close button). */
+  onClose: () => void;
+  /** Drawer title rendered in the header. */
+  title?: string;
+  /** Side the drawer slides from. Default 'right'. */
+  side?: 'left' | 'right';
+  /** Content rendered inside the drawer body. */
+  children?: React.ReactNode;
+  /** Test identifier. */
+  testId?: string;
+}
+
+export const Drawer: React.FC<DrawerProps> = ({
+  open,
+  onClose,
+  title,
+  side = 'right',
+  children,
+  testId = 'drawer',
+}) => {
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus handoff: capture and restore focus
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+      // Move focus into the drawer after render
+      requestAnimationFrame(() => {
+        const close = drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]');
+        close?.focus();
+      });
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [open]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [open, onClose]);
+
+  // Prevent background scroll while open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  const handleBackdropClick = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const sideClass = side === 'left' ? ' drawer--left' : '';
+
+  return (
+    <>
+      <div
+        className={`drawer-backdrop${open ? ' drawer-backdrop--open' : ''}`}
+        onClick={handleBackdropClick}
+        data-testid={`${testId}-backdrop`}
+        aria-hidden="true"
+      />
+      <div
+        ref={drawerRef}
+        className={`drawer${sideClass}${open ? ' drawer--open' : ''}`}
+        role="dialog"
+        aria-modal={open}
+        aria-label={title ?? 'Drawer'}
+        data-testid={testId}
+        {...(!open ? { inert: '' as unknown as string } : {})}
+      >
+        <div className="drawer__header">
+          {title && <h2 className="drawer__title">{title}</h2>}
+          <button
+            type="button"
+            className="drawer__close-btn"
+            onClick={onClose}
+            aria-label="Close drawer"
+            data-drawer-close=""
+            data-testid={`${testId}-close`}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="drawer__body" data-testid={`${testId}-body`}>
+          {children}
+        </div>
+      </div>
+    </>
+  );
+};
+
+Drawer.displayName = 'Drawer';
 
 function NotificationCenter(): React.JSX.Element | null {
   const toasts = useErrorStore((state) => state.toasts);

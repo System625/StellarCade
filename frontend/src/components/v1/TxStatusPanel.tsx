@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { TxPhase, TxStatusMeta, TxStatusError } from '../../types/tx-status';
 import { EnvironmentBadge } from './EnvironmentBadge';
-import { formatAddress, formatDate, formatTxTimestamp, truncateHash } from '../../utils/v1/formatters';
+import { formatAddress, formatDate, formatTxTimestamp, truncateHash, formatCopyableValue } from '../../utils/v1/formatters';
+import { useCopyFeedback } from '../../utils/v1/clipboard';
 import './TxStatusPanel.css';
 
 /**
@@ -151,7 +152,7 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
   sender,
   recipient,
 }) => {
-  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
+  const { state: copyState, copy: triggerCopy } = useCopyFeedback();
 
   const isFailed = phase === TxPhase.FAILED;
   const isPending = phase === TxPhase.PENDING || phase === TxPhase.SUBMITTED;
@@ -159,14 +160,8 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
 
   const handleCopy = useCallback(async () => {
     if (!meta?.hash) return;
-    try {
-      await navigator.clipboard.writeText(meta.hash);
-      setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 2000);
-    } catch {
-      console.error('Failed to copy transaction hash');
-    }
-  }, [meta?.hash]);
+    await triggerCopy(meta.hash);
+  }, [meta?.hash, triggerCopy]);
 
   const handleExplorerClick = useCallback(() => {
     if (!meta?.hash) return;
@@ -262,12 +257,13 @@ export const TxStatusPanel: React.FC<TxStatusPanelProps> = ({
           {showCopyButton && (
             <button
               type="button"
-              className={`tx-status-panel__copy-btn${copyState === 'copied' ? ' tx-status-panel__copy-btn--copied' : ''}`}
+              className={`tx-status-panel__copy-btn${copyState === 'success' ? ' tx-status-panel__copy-btn--copied' : ''}${copyState === 'error' ? ' tx-status-panel__copy-btn--error' : ''}`}
               onClick={handleCopy}
-              aria-label={copyState === 'copied' ? 'Copied!' : 'Copy transaction hash'}
+              aria-label={copyState === 'success' ? 'Copied!' : copyState === 'error' ? 'Copy failed' : 'Copy transaction hash'}
+              aria-live="polite"
               data-testid={`${testId}-copy-btn`}
             >
-              {copyState === 'copied' ? '✓' : '📋'}
+              {copyState === 'success' ? '✓' : copyState === 'error' ? '✗' : '📋'}
             </button>
           )}
         </div>
