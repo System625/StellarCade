@@ -123,7 +123,7 @@ pub fn get_round_snapshot(env: Env) -> Result<RoundSnapshot, Error>
 `Result<RoundSnapshot, Error>`
 
 ### `get_participant_answer_summary`
-Returns deterministic participation and correctness counters for the latest known round.
+Returns participation/correctness counters for the latest round.  If no round exists yet, returns an `Uninitialized` summary. If the latest round is closed, status is `Resolved` with final counters.
 
 ```rust
 pub fn get_participant_answer_summary(env: Env) -> Result<ParticipantAnswerSummary, Error>
@@ -140,7 +140,7 @@ pub fn get_participant_answer_summary(env: Env) -> Result<ParticipantAnswerSumma
 `Result<ParticipantAnswerSummary, Error>`
 
 ### `get_reward_pool_snapshot`
-Returns reward pool and payout totals for the latest known round.
+Returns reward-pool relevant values for the latest round.  If no round exists yet, returns an `Uninitialized` snapshot. During active rounds, distribution values remain zero until close.
 
 ```rust
 pub fn get_reward_pool_snapshot(env: Env) -> Result<RewardPoolSnapshot, Error>
@@ -155,12 +155,6 @@ pub fn get_reward_pool_snapshot(env: Env) -> Result<RewardPoolSnapshot, Error>
 #### Return Type
 
 `Result<RewardPoolSnapshot, Error>`
-
-## Snapshot Status Semantics
-
-- `Uninitialized`: no round has been opened yet.
-- `Active`: latest round is open and may still accept submissions.
-- `Resolved`: latest round is closed; counters and reward values are final.
 
 ### `reserve`
 ```rust
@@ -263,3 +257,4 @@ pub fn balance_of(env: Env, user: Address) -> i128
 #### Return Type
 
 `i128`
+

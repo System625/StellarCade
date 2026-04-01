@@ -197,7 +197,7 @@ pub fn get_round_commitment_summary(env: Env) -> Result<RoundCommitmentSummary, 
 `Result<RoundCommitmentSummary, Error>`
 
 ### `get_winner_count_snapshot`
-Returns winner-count metadata for a specific round.
+Returns winner count for a specific round, with explicit status.
 
 ```rust
 pub fn get_winner_count_snapshot(env: Env, round_id: u32) -> WinnerCountSnapshot
@@ -214,8 +214,3 @@ pub fn get_winner_count_snapshot(env: Env, round_id: u32) -> WinnerCountSnapshot
 
 `WinnerCountSnapshot`
 
-## Snapshot Status Semantics
-
-- `Missing`: target round does not exist.
-- `Unresolved`: round exists but has not been resolved.
-- `Resolved`: round is finalized; `winner_count` is stable.

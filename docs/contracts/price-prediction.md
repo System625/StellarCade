@@ -141,11 +141,7 @@ pub fn get_bet(env: Env, round_id: u64, player: Address) -> Result<BetData, Erro
 `Result<BetData, Error>`
 
 ### `participant_summary`
-Return a compact and deterministic participant summary for a round.
-
-Missing rounds return `has_round = false` with zero counters and an empty
-`positions` list. Existing rounds return one entry per bettor in bet-placement
-order, along with aggregate side counts and wager totals.
+Return a compact participant summary for a round.  Missing rounds return `has_round = false` and an empty participant list.
 
 ```rust
 pub fn participant_summary(env: Env, round_id: u64) -> RoundParticipantSummary
@@ -163,14 +159,7 @@ pub fn participant_summary(env: Env, round_id: u64) -> RoundParticipantSummary
 `RoundParticipantSummary`
 
 ### `settlement_preview`
-Preview settlement using the round's current wager totals and the oracle's
-current price feed.
-
-Before final settlement this output is provisional and should be interpreted as
-"if the round settled right now." Once a round is settled, the preview mirrors
-the final stored result and returns `is_provisional = false`.
-
-Missing rounds return `has_round = false` and zeroed numeric fields.
+Preview settlement using the round's current wagers and the oracle's current price feed. Before final settlement this view is provisional.
 
 ```rust
 pub fn settlement_preview(env: Env, round_id: u64) -> SettlementPreview
@@ -186,3 +175,4 @@ pub fn settlement_preview(env: Env, round_id: u64) -> SettlementPreview
 #### Return Type
 
 `SettlementPreview`
+

@@ -61,12 +61,7 @@ pub fn current_streak(env: Env, user: Address) -> u32
 `u32`
 
 ### `streak_summary`
-Return a per-player streak summary at `as_of_ts`.
-
-Missing players return `status = Missing` with all counters at `0`.
-If the stored streak window has elapsed by `as_of_ts`, the summary returns
-`status = Reset`, `active_streak = 0`, and preserves the previous
-`last_recorded_streak` for UI messaging.
+Return a UI-friendly summary of a player's streak at `as_of_ts`.  Missing players return a zeroed summary with `status = Missing`. Players whose latest activity window has elapsed return `status = Reset` with `active_streak = 0` while preserving the last recorded streak.
 
 ```rust
 pub fn streak_summary(env: Env, user: Address, as_of_ts: u64) -> StreakSummary
@@ -85,11 +80,7 @@ pub fn streak_summary(env: Env, user: Address, as_of_ts: u64) -> StreakSummary
 `StreakSummary`
 
 ### `next_bonus_preview`
-Preview the next streak-bonus threshold and projected reward at `as_of_ts`.
-
-The preview is deterministic for a given `as_of_ts`, side-effect free, and uses
-the effective active streak so broken streaks render from `0` while still
-retaining the player's historic `last_claimed_streak` progression.
+Preview the next streak bonus target for a player at `as_of_ts`.  The preview is side-effect free and uses the effective active streak, making reset streaks render as `active_streak = 0`.
 
 ```rust
 pub fn next_bonus_preview(env: Env, user: Address, as_of_ts: u64) -> NextBonusPreview
@@ -144,9 +135,3 @@ pub fn reset_rules(env: Env, admin: Address, config: StreakRules) -> Result<(), 
 
 `Result<(), Error>`
 
-## Read Semantics
-
-- `StreakSummary.status = Active` means the stored streak is still inside the configured streak window at `as_of_ts`.
-- `StreakSummary.status = Reset` means the streak has timed out; `active_streak` is reset to `0` but `last_recorded_streak` still shows the prior stored value.
-- `StreakSummary.status = Missing` means the player has no recorded activity yet.
-- `NextBonusPreview.threshold_streak` is the next streak count that would unlock a new bonus under the current lifetime `last_claimed_streak` progression.

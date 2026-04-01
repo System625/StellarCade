@@ -157,7 +157,7 @@ pub fn player_rank_lookup(env: Env, game_id: Symbol, player: Address) -> Result<
 `Result<PlayerRankLookup, Error>`
 
 ### `neighboring_slice`
-Returns entries around a ranked player with deterministic boundaries and ordering.
+Returns a deterministic rank-ordered slice around `player`.  `radius` controls how many neighbors above and below are included. Returns an empty slice if the player is not currently ranked.
 
 ```rust
 pub fn neighboring_slice(env: Env, game_id: Symbol, player: Address, radius: u32) -> Vec<ScoreEntry>
@@ -175,11 +175,6 @@ pub fn neighboring_slice(env: Env, game_id: Symbol, player: Address, radius: u32
 #### Return Type
 
 `Vec<ScoreEntry>`
-
-## Missing Player Behavior
-
-- `player_rank_lookup` returns `{ ranked: false, rank: 0 }`.
-- `neighboring_slice` returns an empty vector.
 
 ### `get_player_score`
 Get a player's raw score.
@@ -199,3 +194,4 @@ pub fn get_player_score(env: Env, game_id: Symbol, player: Address) -> u64
 #### Return Type
 
 `u64`
+

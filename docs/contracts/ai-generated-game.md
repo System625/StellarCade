@@ -1,5 +1,7 @@
 # ai-generated-game
 
+Read model returned by `get_session_snapshot`.  Exposes enough state for a client to resume an in-progress session without leaking sensitive prompt internals. The `prompt_hash` field is the SHA-256 commitment stored at game creation — it is safe to expose for verification purposes but does NOT reveal the underlying prompt content.  Fields intentionally omitted (redacted): - Raw prompt / config payload (never stored on-chain; only the hash is kept) - Oracle result payload (stored off-chain; not part of on-chain state) - Internal reward-claim flags (private accounting detail)
+
 ## Public Methods
 
 ### `init`
@@ -83,6 +85,24 @@ pub fn resolve_ai_game(env: Env, oracle: Address, game_id: u64, result_payload: 
 
 `Result<(), Error>`
 
+### `get_session_snapshot`
+Returns a stable read-only snapshot of a session for client resume flows.  Safe to call without authentication — no sensitive internals are exposed. Returns a deterministic `Missing` snapshot when the game_id is unknown, so callers never need to handle a hard error for a simple lookup.
+
+```rust
+pub fn get_session_snapshot(env: Env, game_id: u64) -> SessionSnapshot
+```
+
+#### Parameters
+
+| Name | Type |
+|------|------|
+| `env` | `Env` |
+| `game_id` | `u64` |
+
+#### Return Type
+
+`SessionSnapshot`
+
 ### `claim_ai_reward`
 Authorizes player to claim rewards mapped after oracle validation finishes.
 
@@ -102,48 +122,3 @@ pub fn claim_ai_reward(env: Env, player: Address, game_id: u64) -> Result<(), Er
 
 `Result<(), Error>`
 
-### `get_session_snapshot`
-Returns a stable, read-only snapshot of a session for client resume flows. No authentication required.
-
-Returns a deterministic `Missing` snapshot when the `game_id` is unknown — callers never receive a hard error for a simple lookup. The snapshot exposes verification-friendly prompt metadata without leaking sensitive prompt internals, and remains stable for future moderation or review flows.
-
-```rust
-pub fn get_session_snapshot(env: Env, game_id: u64) -> SessionSnapshot
-```
-
-#### Parameters
-
-| Name | Type |
-|------|------|
-| `env` | `Env` |
-| `game_id` | `u64` |
-
-#### Return Type
-
-`SessionSnapshot`
-
-#### SessionSnapshot Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `game_id` | `u64` | The requested game identifier. |
-| `status` | `SnapshotStatus` | `Missing`, `Active`, or `Completed`. |
-| `prompt_hash` | `BytesN<32>` | SHA-256 commitment of the game config stored at creation. Zero-filled when `Missing`. |
-| `winner` | `Option<Address>` | Set after oracle resolution; `None` while active or missing. |
-| `has_winner` | `bool` | Convenience flag — `true` when `winner` is `Some`. |
-
-#### SnapshotStatus Values
-
-| Variant | Meaning |
-|---------|---------|
-| `Missing` | No session exists for the requested `game_id`. |
-| `Active` | Session exists and is in `Created` or `InProgress` state. |
-| `Completed` | Session has been resolved by the oracle. |
-
-#### Redacted Fields
-
-The following are intentionally absent from the snapshot to prevent sensitive data leakage:
-
-- **Raw prompt / config payload** — never stored on-chain; only the SHA-256 hash is persisted.
-- **Oracle result payload** — stored off-chain; not part of on-chain state.
-- **Internal reward-claim flags** — private accounting detail; not relevant to session resume.

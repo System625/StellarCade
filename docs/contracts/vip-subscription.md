@@ -102,12 +102,7 @@ pub fn status_of(env: Env, user: Address) -> SubscriptionStatus
 `SubscriptionStatus`
 
 ### `subscription_status`
-Return a frontend-friendly subscription status for `user`.
-
-This accessor explicitly separates:
-- `NeverSubscribed` users with no stored record.
-- `Active` users whose `expires_at` is still in the future.
-- `Expired` users whose record remains on-chain for renewal and auditability.
+Return a frontend-friendly subscription status for `user`.  Missing users return `NeverSubscribed`, while expired users retain their stored `plan_id` and `expires_at` for renewal messaging.
 
 ```rust
 pub fn subscription_status(env: Env, user: Address) -> UserSubscriptionStatus
@@ -125,12 +120,7 @@ pub fn subscription_status(env: Env, user: Address) -> UserSubscriptionStatus
 `UserSubscriptionStatus`
 
 ### `renewal_preview`
-Preview the next renewal cost and timing for `user`.
-
-This accessor is side-effect free. Active subscriptions preview stacked renewal
-from the current `expires_at`; expired subscriptions preview reactivation from
-the current ledger timestamp; never-subscribed users return `can_renew = false`
-with zeroed cost and timing fields.
+Preview the effect of renewing the user's current subscription now.  This accessor never mutates state. Active subscriptions preview a stacked renewal from the current expiry; expired subscriptions preview a renewal starting from `now`; never-subscribed users return `can_renew = false`.
 
 ```rust
 pub fn renewal_preview(env: Env, user: Address) -> RenewalPreview
@@ -146,3 +136,4 @@ pub fn renewal_preview(env: Env, user: Address) -> RenewalPreview
 #### Return Type
 
 `RenewalPreview`
+
